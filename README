@@ -1,0 +1,63 @@
+==ABOUT==
+This application can be used to mount a Flickr account directly onto a users
+file system. The photos will seem to be on the local machine but all changes done
+will also affect the users Flickr account.
+
+Photos will be placed in directories that represent which photoset the photo
+belongs to. If a photo does not belong to a photoset, the photo will appear in
+the root director (the directory used to mount FlickrFS). A photo that has an
+empty name in Flickr, will display its flickr photo id instead on FlickrFS.
+
+==INSTALLATION==
+Dependencies:
+	FUSE (tested on fuse-2.8.5)
+		http://fuse.sourceforge.net/
+	>=Flickcurl-1.20
+		http://librdf.org/flickcurl/
+
+You must allow the access of FlickrFS to your Flickr account. FlickrFS uses
+Flickcurl to talk with Flickr. You must setup ~/.flickcurl.conf as follows:
+
+$ cat ~/.flickcurl.conf
+[flickr]
+api_key=2e66493ec959256a79e4e5a3da7df729
+secret=c1b99d47790391c3
+$
+
+Then visit:
+http://www.flickr.com/services/auth/?mobile=1&api_key=2e66493ec959256a79e4e5a3da7df729&perms=delete&api_sig=6417abca6880d676c010600e8c65a045
+and select:
+[OK, I'LL AUTHORIZE IT]
+
+This will allow the user the ability to link their Flickr account with FlickrFS.
+The user will be given a 9-digit FROB that can be given to the flickcurl api to
+link the user's account to the interface. Finally, execute:
+
+flickcurl -a 123-456-789
+
+where 123-456-789 is the 9-digit FROB given to the user above. This will finish
+the linking of the user's account with the flickcurl API and library and the
+user should then see the following format in their configuration file:
+
+$ cat ~/.flickcurl.conf
+[flickr]
+auth_token=-------
+api_key=2e66493ec959256a79e4e5a3da7df729
+secret=c1b99d47790391c3
+$
+
+See http://librdf.org/flickcurl/ for more information on Flickrcurl API
+configuration and http://www.flickr.com/services/apps/72157623762128193/
+for the info on the api key and secret of FlickrFS.
+
+FlickrFS comes with a custom Makefile that can be used to create the binary
+application.
+
+
+
+==Q/A==
+Q: Why isn't the flickcurl.pc file not able to be found by pkg-config?
+
+A: It is installed in /usr/local/lib/pkgconfig by default. You will have to add
+this directory to the PKG_CONFIG_PATH environment variable using the command:
+export PKG_CONFIG_PATH=/usr/local/lib/pkgconfig/
