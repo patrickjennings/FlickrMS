@@ -31,11 +31,11 @@ static gid_t gid;	/* The group id of the user */
 static int slash_index(const char *path) {
 	unsigned int i;
 	if(!path)
-		return -1;
+		return FAIL;
 	for(i = 0; i < strlen(path); i++)
 		if(path[i] == '/')
 			return i;
-	return -1;
+	return FAIL;
 }
 
 /*
@@ -98,7 +98,9 @@ static int ffs_getattr(const char *path, struct stat *stbuf) {
 			strncpy(photoset, lookup_path, index);
 			photoset[index] = '\0';
 
-			if((ci = photo_lookup(photoset, lookup_path + index + 1))) {
+			ci = photo_lookup(photoset, lookup_path + index + 1);
+			free(photoset);
+			if(ci) {
 				set_stbuf(stbuf, S_IFREG | PERMISSIONS, uid, gid, ci->size, ci->time, 1);
 				return SUCCESS;
 			}
@@ -117,21 +119,16 @@ static int ffs_readdir(const char *path, void *buf,
 	(void)offset;
 	(void)fi;
 
-	printf("Path %s\n", path);
 	if(!strcmp(path, "/")) {
-		/* FIXME */
 		size = get_photo_names("", &names);
-		printf("get_photo_names worked\n");
 		for(i = 0; i < size; i++)
 			filler(buf, names[i], NULL, 0);
 		if(size > 0)
 			free(names);
 		size = get_photoset_names(&names);
 	}
-	else {
+	else
 		size = get_photo_names(path + 1, &names);
-		printf("Size: %d\n", size);
-	}
 
 	if(size < 0)
 		return -ENOENT;
@@ -146,6 +143,52 @@ static int ffs_readdir(const char *path, void *buf,
 	return SUCCESS;
 }
 
+static int ffs_mkdir(const char *path, mode_t mode) {
+	(void)mode;
+	printf("Path: %s\n", path);
+	return SUCCESS;
+}
+
+static int ffs_create(const char *path, mode_t mode, struct fuse_file_info *fi) {
+	(void)mode;
+	(void)fi;
+	printf("Create: %s\n", path);
+	return SUCCESS;
+}
+
+static int ffs_write(const char *path, const char *buf,
+  size_t size, off_t offset, struct fuse_file_info *fi) {
+	(void)path;
+	(void)buf;
+	(void)offset;
+	(void)fi;
+	return size;
+}
+
+static int ffs_rename(const char *oldpath, const char *newpath) {
+	const char *old_path = oldpath + 1;
+	const char *new_path = newpath + 1;
+	int old_index = slash_index(old_path);
+	int new_index = slash_index(new_path);
+
+	if(old_index < 1 && new_index < 1)
+		set_photo_name("", old_path, new_path);
+	/*else {
+		char *old_set = (char *)malloc(old_index + 1);
+		char *new_set = (char *)malloc(new_index + 1);
+		if(!old_set || !new_set)
+			return -ENOMEM;
+		strncpy(old_set, old_path, old_index);
+		strncpy(new_set, new_path, new_index);
+		old_set[old_index] = '\0';
+		new_set[new_index] = '\0';
+
+		set_photo_name(old_set, old_path + old_index + 1, new_path + new_index + 1);
+	}*/
+
+	return SUCCESS;
+}
+
 /**
  * Main function
 **/
@@ -154,6 +197,10 @@ static int ffs_readdir(const char *path, void *buf,
 static struct fuse_operations flickrfs_oper = {
 	.getattr = ffs_getattr,
 	.readdir = ffs_readdir,
+	.mkdir = ffs_mkdir,
+	.create = ffs_create,
+	.write = ffs_write,
+	.rename = ffs_rename
 };
 
 int main(int argc, char *argv[]) {

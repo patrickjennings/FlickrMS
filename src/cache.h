@@ -17,5 +17,6 @@ int get_photoset_names(char ***names);
 int get_photo_names(const char *photoset, char ***names);
 cached_information *photoset_lookup(const char *photoset);
 cached_information *photo_lookup(const char *photoset, const char *photo);
+int set_photo_name(const char *photoset, const char *photo, const char *newname);
 
 #endif

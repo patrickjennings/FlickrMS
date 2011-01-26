@@ -1,8 +1,10 @@
 /**
  * Patrick Jennings
  *
- * TODO: Make thread-safe using mutex
- * TODO: Age/invalidate the cache
+ * TODO: Enhance (performance-wise) thread-safety mechanisms
+ *	* Release lock while communicating with Flickr.
+ * TODO: Enhance aging/invalidating the cache
+ *	* Place cache cleaning in seperate thread. Would require a r/w lock.
 **/
 
 #include <flickcurl.h>
@@ -107,9 +109,8 @@ static int flickr_init() {
 
 	login = flickcurl_test_login(fc);
 
-	if(!login) {
+	if(!login)
 		return FAIL;
-	}
 
 	free(login);
 	return SUCCESS;
@@ -412,3 +413,36 @@ cached_information *photo_lookup(const char *photoset, const char *photo) {
 	else
 		return 0;
 }
+
+int set_photo_name(const char *photoset, const char *photo, const char *newname) {
+	cached_information *ci;
+	int ret;
+
+	if(!strcmp(photo, newname))
+		return SUCCESS;
+	if(!(ci = photo_lookup(photoset, photo)))
+		return FAIL;
+
+	pthread_mutex_lock(&cache_lock);
+	ret = flickcurl_photos_setMeta(fc, ci->id, newname, "");
+	last_cleaned = 0;
+	pthread_mutex_unlock(&cache_lock);
+
+	return ret;
+}
+
+/*int set_photo_photoset(const char *oldset, const char *newset, const char *photo) {
+	cached_information ci;
+	if(!strcmp(oldset, newset))
+		return SUCCESS;
+	if(!(ci = photo_lookup(oldset, photo)))
+		return FAIL;
+
+	pthread_mutex_lock(&cache_lock);
+	flickcurl_photos_setMeta(fc, ci.id, newname, "");
+	last_cleaned = 0;
+	pthread_mutex_unlock(&cache_lock);
+
+	return SUCCESS;
+}*/
+
