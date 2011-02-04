@@ -169,7 +169,7 @@ static int check_cache() {
 	if((time(NULL) - last_cleaned) < DEFAULT_CACHE_TIMEOUT)
 		return SUCCESS;
 
-// 	/* Wipe entire cache */
+	/* Wipe entire cache */
 	g_hash_table_foreach_remove(photoset_ht, free_photoset_ht, NULL);
 
 	/* Create an empty photoset container for the photos not in a photoset */
@@ -371,6 +371,13 @@ int get_photo_names(const char *photoset, char ***names) {
 	return size;
 }
 
+/* Looks for the photoset specified in the argument.
+ * Returns pointer to the stored cached_information
+ * or 0 if not found.
+ * The structure exists in static mem. DO NOT FREE.
+ * This is for informational purposes only (use get/set
+ * methods for editing photoset information).
+ */
 cached_information *photoset_lookup(const char *photoset) {
 	cached_photoset *cps;
 
@@ -387,6 +394,13 @@ cached_information *photoset_lookup(const char *photoset) {
 		return 0;
 }
 
+/* Looks for the photo specified in the arguments.
+ * Returns pointer to the stored cached_information
+ * or 0 if not found.
+ * The structure exists in static mem. DO NOT FREE.
+ * This is for informational purposes only (use get/set
+ * methods for editing photo information).
+ */
 cached_information *photo_lookup(const char *photoset, const char *photo) {
 	cached_photoset *cps;
 	cached_photo *cp;
@@ -414,6 +428,9 @@ cached_information *photo_lookup(const char *photoset, const char *photo) {
 		return 0;
 }
 
+/* Renames the photo specified in the args to the
+ * new name.
+ */
 int set_photo_name(const char *photoset, const char *photo, const char *newname) {
 	cached_information *ci;
 	int ret;
@@ -432,17 +449,6 @@ int set_photo_name(const char *photoset, const char *photo, const char *newname)
 }
 
 /*int set_photo_photoset(const char *oldset, const char *newset, const char *photo) {
-	cached_information ci;
-	if(!strcmp(oldset, newset))
-		return SUCCESS;
-	if(!(ci = photo_lookup(oldset, photo)))
-		return FAIL;
-
-	pthread_mutex_lock(&cache_lock);
-	flickcurl_photos_setMeta(fc, ci.id, newname, "");
-	last_cleaned = 0;
-	pthread_mutex_unlock(&cache_lock);
-
-	return SUCCESS;
+	
 }*/
 
