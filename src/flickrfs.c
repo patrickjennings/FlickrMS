@@ -189,6 +189,12 @@ static int ffs_rename(const char *oldpath, const char *newpath) {
 	return SUCCESS;
 }
 
+static int ffs_open(const char *path, struct fuse_file_info *fi) {
+	(void)fi;
+	return SUCCESS;
+}
+
+
 /**
  * Main function
 **/
@@ -198,6 +204,7 @@ static struct fuse_operations flickrfs_oper = {
 	.getattr = ffs_getattr,
 	.readdir = ffs_readdir,
 	.mkdir = ffs_mkdir,
+	.open = ffs_open,
 	.create = ffs_create,
 	.write = ffs_write,
 	.rename = ffs_rename
@@ -209,7 +216,8 @@ int main(int argc, char *argv[]) {
 	if(setUser())
 		return FAIL;
 
-	flickr_cache_init();
+	if(flickr_cache_init())
+		return FAIL;
 
 	ret = fuse_main(argc, argv, &flickrfs_oper, NULL);
 

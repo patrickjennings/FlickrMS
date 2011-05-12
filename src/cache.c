@@ -18,7 +18,6 @@
 
 
 #define DEFAULT_CACHE_TIMEOUT	30
-#define MAX_CACHE_SIZE		10000
 #define MAX_CONF_PATH_SIZE	1024
 #define CACHE_UNSET		0
 #define CACHE_SET		1
@@ -98,7 +97,7 @@ static int flickr_init() {
         
 	home = getenv("HOME");
 	/* Buffer overflow protection. no home directory paths greater than so many chars. */
-	if(home && strlen(home) < (MAX_CONF_PATH_SIZE - 20))
+	if(home && (strlen(home) < (MAX_CONF_PATH_SIZE - 20)))
 		sprintf(config_path, "%s/%s", home, ".flickcurl.conf");
 	else
 		return FAIL;
@@ -258,13 +257,15 @@ static int check_photoset_cache(cached_photoset *cps) {
  * Initiates a new flickcurl connection and creates the caching
  * mechanism.
 */
-void flickr_cache_init() {
+int flickr_cache_init() {
 	g_thread_init(NULL);
-	flickr_init();
+	if(flickr_init())
+		return FAIL;
 	photoset_ht = g_hash_table_new(g_str_hash, g_str_equal);
 	last_cleaned = 0;
 	pthread_mutex_init(&cache_lock, NULL);
 	check_cache();
+	return SUCCESS;
 }
 
 /*

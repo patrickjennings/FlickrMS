@@ -6,10 +6,11 @@ typedef struct {
 	char *id;
 	time_t time;
 	unsigned int size;
+	char *data;
 } cached_information;
 
 
-void flickr_cache_init();
+int flickr_cache_init();
 void flickr_cache_kill();
 
 int photoDelete(char *photo_id);
