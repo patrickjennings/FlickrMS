@@ -14,10 +14,13 @@
 #define SUCCESS		0
 #define FAIL		-1
 #define PERMISSIONS	0755
+#define BUFFER_SIZE	1024
+#define TMP_DIR_NAME	".flickrfs"
 
 
 static uid_t uid;	/* The user id of the user that mounted the filesystem */
 static gid_t gid;	/* The group id of the user */
+static char tmp_path[BUFFER_SIZE];
 
 
 /**
@@ -43,15 +46,26 @@ static int slash_index(const char *path) {
  * uid/gid. Want to only give the user access to their flickr account.
  */
 static int setUser() {
-    struct passwd *pw;
-    if(!(pw = getpwnam(getenv("USER"))))
-	return FAIL;
-    
-    uid = pw->pw_uid;
-    gid = pw->pw_gid;
-    
-    return SUCCESS;
+	struct passwd *pw;
+	if(!(pw = getpwnam(getenv("USER"))))
+		return FAIL;
+
+	uid = pw->pw_uid;
+	gid = pw->pw_gid;
+
+	return SUCCESS;
 }
+
+static int setTMPDir() {
+	char *home = getenv("HOME");
+	
+	if(!home && (strlen(home) < (BUFFER_SIZE - 10)))
+		return FAIL;
+	sprintf(tmp_path, "%s/%s", home, TMP_DIR_NAME);
+
+	return 0 - mkdir(tmp_path, PERMISSIONS);
+}
+
 
 /**
 * File system functions
@@ -78,7 +92,7 @@ static int ffs_getattr(const char *path, struct stat *stbuf) {
 		return SUCCESS;
 	}
 	else {
-		cached_information *ci;
+		const cached_information *ci;
 		const char *lookup_path = path + 1;
 		int index = slash_index(lookup_path);
 		if(index < 1) {
@@ -191,6 +205,7 @@ static int ffs_rename(const char *oldpath, const char *newpath) {
 
 static int ffs_open(const char *path, struct fuse_file_info *fi) {
 	(void)fi;
+	(void)path;
 	return SUCCESS;
 }
 
@@ -213,11 +228,14 @@ static struct fuse_operations flickrfs_oper = {
 int main(int argc, char *argv[]) {
 	int ret;
 
-	if(setUser())
-		return FAIL;
+	if((ret = setUser()))
+		return ret;
 
-	if(flickr_cache_init())
-		return FAIL;
+	if((ret = setTMPDir()) == FAIL)
+		return ret;
+
+	if((ret = flickr_cache_init()))
+		return ret;
 
 	ret = fuse_main(argc, argv, &flickrfs_oper, NULL);
 

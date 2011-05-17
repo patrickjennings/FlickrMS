@@ -18,7 +18,11 @@
 
 
 #define DEFAULT_CACHE_TIMEOUT	30
-#define MAX_CONF_PATH_SIZE	1024
+#define BUFFER_SIZE		1024
+#define CONF_FILE_NAME		".flickcurl.conf"
+
+#define GET_PHOTO_SIZE		's'
+
 #define CACHE_UNSET		0
 #define CACHE_SET		1
 
@@ -34,6 +38,7 @@ typedef struct {
 
 typedef struct {
 	cached_information ci;
+	char *uri;
 } cached_photo;
 
 
@@ -89,7 +94,7 @@ static void read_conf(void* userdata, const char* key, const char* value) {
 */
 static int flickr_init() {
 	char* home;
-	char config_path[MAX_CONF_PATH_SIZE];
+	char config_path[BUFFER_SIZE];
 	char *login;
 
 	flickcurl_init();
@@ -97,8 +102,8 @@ static int flickr_init() {
         
 	home = getenv("HOME");
 	/* Buffer overflow protection. no home directory paths greater than so many chars. */
-	if(home && (strlen(home) < (MAX_CONF_PATH_SIZE - 20)))
-		sprintf(config_path, "%s/%s", home, ".flickcurl.conf");
+	if(home && (strlen(home) < (BUFFER_SIZE - 20)))
+		sprintf(config_path, "%s/%s", home, CONF_FILE_NAME);
 	else
 		return FAIL;
 
@@ -226,6 +231,7 @@ static int check_photoset_cache(cached_photoset *cps) {
 
 		if(!(cp = (cached_photo *)malloc(sizeof(cached_photo))))
 			return FAIL;
+		cp->uri = strdup(flickcurl_photo_as_source_uri(fp[j], GET_PHOTO_SIZE));
 		cp->ci.name = strdup(fp[j]->fields[PHOTO_FIELD_title].string);
 		cp->ci.id = strdup(fp[j]->id);
 
@@ -375,11 +381,8 @@ int get_photo_names(const char *photoset, char ***names) {
 /* Looks for the photoset specified in the argument.
  * Returns pointer to the stored cached_information
  * or 0 if not found.
- * The structure exists in static mem. DO NOT FREE.
- * This is for informational purposes only (use get/set
- * methods for editing photoset information).
  */
-cached_information *photoset_lookup(const char *photoset) {
+const cached_information *photoset_lookup(const char *photoset) {
 	cached_photoset *cps;
 
 	pthread_mutex_lock(&cache_lock);
@@ -395,14 +398,11 @@ cached_information *photoset_lookup(const char *photoset) {
 		return 0;
 }
 
-/* Looks for the photo specified in the arguments.
- * Returns pointer to the stored cached_information
- * or 0 if not found.
- * The structure exists in static mem. DO NOT FREE.
- * This is for informational purposes only (use get/set
- * methods for editing photo information).
+/*
+ * Internal method to get the cached_photo of
+ * a particular photo.
  */
-cached_information *photo_lookup(const char *photoset, const char *photo) {
+static cached_photo *get_photo(const char *photoset, const char *photo) {
 	cached_photoset *cps;
 	cached_photo *cp;
 
@@ -423,8 +423,28 @@ cached_information *photo_lookup(const char *photoset, const char *photo) {
 	}
 	cp = g_hash_table_lookup(cps->photo_ht, photo);
 	pthread_mutex_unlock(&cache_lock);
-	if(cp)
+	return cp;
+}
+
+/* Looks for the photo specified in the arguments.
+ * Returns pointer to the stored cached_information
+ * or 0 if not found.
+ */
+const cached_information *photo_lookup(const char *photoset, const char *photo) {
+	cached_photo *cp;
+	if((cp = get_photo(photoset, photo)))
 		return &(cp->ci);
+	else
+		return 0;
+}
+
+/* Returns the URI used to get the actual image of
+ * picture.
+ */
+const char *get_photo_uri(const char *photoset, const char *photo) {
+	cached_photo *cp;
+	if((cp = get_photo(photoset, photo)))
+		return cp->uri;
 	else
 		return 0;
 }
@@ -433,15 +453,18 @@ cached_information *photo_lookup(const char *photoset, const char *photo) {
  * new name.
  */
 int set_photo_name(const char *photoset, const char *photo, const char *newname) {
-	cached_information *ci;
+	const cached_information *ci;
 	int ret;
 
 	if(!strcmp(photo, newname))
 		return SUCCESS;
-	if(!(ci = photo_lookup(photoset, photo)))
-		return FAIL;
-
+	
 	pthread_mutex_lock(&cache_lock);
+	if(!(ci = photo_lookup(photoset, photo))) {
+		pthread_mutex_unlock(&cache_lock);
+		return FAIL;
+	}
+
 	ret = flickcurl_photos_setMeta(fc, ci->id, newname, "");
 	last_cleaned = 0;
 	pthread_mutex_unlock(&cache_lock);
