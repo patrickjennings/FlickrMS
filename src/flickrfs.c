@@ -163,12 +163,12 @@ static int ffs_mkdir(const char *path, mode_t mode) {
 	return SUCCESS;
 }
 
-static int ffs_create(const char *path, mode_t mode, struct fuse_file_info *fi) {
+/*static int ffs_create(const char *path, mode_t mode, struct fuse_file_info *fi) {
 	(void)mode;
 	(void)fi;
 	printf("Create: %s\n", path);
 	return SUCCESS;
-}
+}*/
 
 static int ffs_write(const char *path, const char *buf,
   size_t size, off_t offset, struct fuse_file_info *fi) {
@@ -220,7 +220,7 @@ static struct fuse_operations flickrfs_oper = {
 	.readdir = ffs_readdir,
 	.mkdir = ffs_mkdir,
 	.open = ffs_open,
-	.create = ffs_create,
+	/*.create = ffs_create,*/
 	.write = ffs_write,
 	.rename = ffs_rename
 };

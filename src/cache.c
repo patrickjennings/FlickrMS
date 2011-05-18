@@ -132,15 +132,26 @@ static void flickr_kill() {
 
 /* Creates a new cached_photoset using the pointer and name/id provided */
 static int new_cached_photoset(cached_photoset **cps, char *name, char *id) {
+	unsigned int i;
+	cached_information *ci;
+
 	*cps = (cached_photoset *)malloc(sizeof(cached_photoset));
 	if(!cps)
 		return -1;
-	(*cps)->ci.name = strdup(name);
-	(*cps)->ci.id = strdup(id);
-	(*cps)->ci.time = 0;
-	(*cps)->ci.size = 0;
+
+	ci = &((*cps)->ci);
+	ci->name = strdup(name);
+	ci->id = strdup(id);
+	ci->time = 0;
+	ci->size = 0;
 	(*cps)->set = CACHE_UNSET;
 	(*cps)->photo_ht = g_hash_table_new(g_str_hash, g_str_equal);
+
+	/* Replace backslashes with spaces */
+	for(i = 0; i < strlen(ci->name); i++) {
+		if(ci->name[i] == '/')
+			ci->name[i] = ' ';
+	}
 	return 0;
 }
 
