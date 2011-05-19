@@ -1,4 +1,5 @@
 #define FUSE_USE_VERSION 26
+#define _XOPEN_SOURCE 500
 
 #include <fuse.h>
 #include <stdio.h>
@@ -7,6 +8,7 @@
 #include <errno.h>
 #include <pwd.h>
 #include <sys/types.h>
+#include <unistd.h>
 
 #include "cache.h"
 #include "wget.h"
@@ -109,7 +111,7 @@ static inline int setTMPDir() {
 
 
 /**
-* File system functions
+ * File system functions
 **/
 
 static inline void set_stbuf(struct stat *stbuf, mode_t mode, uid_t uid,
@@ -164,9 +166,7 @@ static int ffs_getattr(const char *path, struct stat *stbuf) {
 	return -ENOENT;
 }
 
-/*
- * Read directory
- */
+/* Read directory */
 static int ffs_readdir(const char *path, void *buf,
   fuse_fill_dir_t filler, off_t offset, struct fuse_file_info *fi) {
 	int size, i;
@@ -204,15 +204,6 @@ static int ffs_mkdir(const char *path, mode_t mode) {
 	return SUCCESS;
 }
 
-static int ffs_write(const char *path, const char *buf,
-  size_t size, off_t offset, struct fuse_file_info *fi) {
-	(void)path;
-	(void)buf;
-	(void)offset;
-	(void)fi;
-	return size;
-}
-
 static int ffs_rename(const char *oldpath, const char *newpath) {
 	const char *old_path = oldpath + 1;
 	const char *new_path = newpath + 1;
@@ -238,7 +229,6 @@ static int ffs_rename(const char *oldpath, const char *newpath) {
 }
 
 static int ffs_open(const char *path, struct fuse_file_info *fi) {
-	(void)fi;
 	char *photo;
 	char *photoset;
 	const char *uri;
@@ -261,7 +251,10 @@ static int ffs_open(const char *path, struct fuse_file_info *fi) {
 
 	strcpy(wget_path, tmp_path);
 	strcat(wget_path, path);
-	wget(uri, wget_path);		/* Get the image from flickr and put it into the tmp dir */
+	if(wget(uri, wget_path) < 0)		/* Get the image from flickr and put it into the tmp dir */
+		return FAIL;
+
+	fi->fh = open(wget_path, fi->flags);
 
 	free(wget_path);
 	free(photoset);
@@ -269,6 +262,20 @@ static int ffs_open(const char *path, struct fuse_file_info *fi) {
 	return SUCCESS;
 }
 
+static int ffs_read(const char *path, char *buf, size_t size,
+  off_t offset, struct fuse_file_info *fi) {
+  	(void)path;
+	return pread(fi->fh, buf, size, offset);
+}
+
+static int ffs_write(const char *path, const char *buf, size_t size,
+  off_t offset, struct fuse_file_info *fi) {
+	(void)path;
+	(void)buf;
+	(void)offset;
+	(void)fi;
+	return size;
+}
 
 /**
  * Main function
@@ -280,6 +287,7 @@ static struct fuse_operations flickrfs_oper = {
 	.readdir = ffs_readdir,
 	.mkdir = ffs_mkdir,
 	.open = ffs_open,
+	.read = ffs_read,
 	.write = ffs_write,
 	.rename = ffs_rename
 };
