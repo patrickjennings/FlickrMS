@@ -9,6 +9,7 @@
 #include <sys/types.h>
 
 #include "cache.h"
+#include "wget.h"
 
 
 #define SUCCESS		0
@@ -20,9 +21,10 @@
 
 static uid_t uid;	/* The user id of the user that mounted the filesystem */
 static gid_t gid;	/* The group id of the user */
-static char tmp_path[BUFFER_SIZE];
+static char *tmp_path;
 
 static char emptystr[] = "";
+
 
 /**
  * Helper functions
@@ -45,20 +47,16 @@ static int slash_index(const char *path) {
 /* 
  * Internal method for splitting a path of the format:
  * "/photosetname/photoname"
- * into:
- * photoset = "photosetname"
- * photo = "photoname"
+ * into: photoset = "photosetname" and photo = "photoname"
  */
 static int split_path(const char *path, char **photoset, char **photo) {
 	int i;
 	char *path_dup;
 
 	path_dup = strdup(path + 1);
-
 	i = slash_index(path_dup);
 
-	if(!path || !photoseit || !(*photoset) || !photo || !(*photo) || !path_dup ||
-	   i < 0)
+	if(!path || !photoset || !(*photoset) || !photo || !(*photo) || !path_dup)
 	  	return FAIL;
 
 	if(i >= 0) {
@@ -79,7 +77,7 @@ static int split_path(const char *path, char **photoset, char **photo) {
  * Sets the uid/gid variables to the user's (who mounted the filesystem)
  * uid/gid. Want to only give the user access to their flickr account.
  */
-static int setUser() {
+static inline int setUser() {
 	struct passwd *pw;
 	if(!(pw = getpwnam(getenv("USER"))))
 		return FAIL;
@@ -90,10 +88,19 @@ static int setUser() {
 	return SUCCESS;
 }
 
-static int setTMPDir() {
-	char *home = getenv("HOME");
-	
-	if(!home && (strlen(home) < (BUFFER_SIZE - 10)))
+/*
+ * Set the path to the directory that will be used to get the image
+ * data from Flickr.
+ */
+static inline int setTMPDir() {
+	char *home;
+
+	if(!(home = getenv("HOME")))
+		return FAIL;
+
+	tmp_path = (char *)malloc(strlen(home) + strlen(TMP_DIR_NAME) + 2);
+
+	if(!tmp_path)
 		return FAIL;
 	sprintf(tmp_path, "%s/%s", home, TMP_DIR_NAME);
 
@@ -234,8 +241,24 @@ static int ffs_open(const char *path, struct fuse_file_info *fi) {
 	(void)fi;
 	char *photo;
 	char *photoset;
-	split_path(path, &photoset, &photo);
-	printf("Photoset: %s\n Photo: %s\n", photoset, photo);
+	const char *uri;
+	char *wget_path;
+
+	if(split_path(path, &photoset, &photo))
+		return FAIL;
+
+	uri = get_photo_uri(photoset, photo);
+	if(!uri)
+		return FAIL;
+
+	wget_path = (char *)malloc(strlen(tmp_path) + strlen(path) + 1);
+	wget_path[0] = '\0';
+	strcat(wget_path, tmp_path);
+	strcat(wget_path, path);
+
+	wget(uri, wget_path);
+
+	free(wget_path);
 	free(photoset);
 	free(photo);
 	return SUCCESS;
@@ -271,6 +294,6 @@ int main(int argc, char *argv[]) {
 	ret = fuse_main(argc, argv, &flickrfs_oper, NULL);
 
 	flickr_cache_kill();
-
+	free(tmp_path);
 	return ret;
 }
