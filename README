@@ -1,24 +1,52 @@
-==ABOUT==
-This application can be used to mount a Flickr account directly onto a users
-file system. The photos will seem to be on the local machine but all changes done
-will also affect the users Flickr account.
+==Authors==
+Created by:	Patrick Jennings
+Website:	https://github.com/patrickjennings/FlickrFS
+
+==About==
+Are you tired of spending a significant amount of time messing around with the
+Flickr website? Are you sick of seeing advertisements on every page you load?
+Or are you just looking for an easier way to manage your Flickr photos from any
+computer? Imagine being able to use the applications you want to view and modify
+your photos while still taking advantage of the unlimited storage space of the
+Flickr cloud! Paying for Flickr Pro is no longer the only option for satisfying
+your desire for photo perfection... not when there is FlickrFS!
+
+This application can be used to mount a Flickr account directly onto your
+file system. The photos will seem to be on your local machine but all changes done
+will also affect the users Flickr account. Once mounted, the file system will
+act like any other directory and you can use any of your favorite image viewers
+or editors to access your Flickr photos!
 
 Photos will be placed in directories that represent which photoset the photo
 belongs to. If a photo does not belong to a photoset, the photo will appear in
-the root director (the directory used to mount FlickrFS). A photo that has an
-empty name in Flickr, will display its flickr photo id instead on FlickrFS.
+the root director. A photo that has an empty name in Flickr, will display its
+Flickr photo id instead. All of this is to ensure that all of your photos will be
+organized the way you intended and are perfectly viewable from the file system.
+
+The application is written in C and was designed for efficiency and compatability.
+It will run on any POSIX complient machine. This means all UNIX-based and BSD-based
+machines should be supported. The application will use the lowest amount of resources
+possible. Obviously, this application will use your Flickr account to store photos so
+no persistent storage is necessary. The internal caching mechanism dynamically grows
+to allow for infinite storage capacity while still recognizing remote changes to the
+Flickr account.
+
+Flickrfs was written by an experienced and well-educated hacker. As such, the file system
+will be tested for bugs and UI malfunctions. If you find any pressing concerns, please
+let them be known at the following URL:
+https://github.com/patrickjennings/FlickrFS/issues
 
 ==INSTALLATION==
 Dependencies:
 	FUSE (tested on fuse-2.8.5)
 		http://fuse.sourceforge.net/
-	>=Flickcurl-1.20
+	>=Flickcurl-1.21
 		http://librdf.org/flickcurl/
 
 You must allow the access of FlickrFS to your Flickr account. FlickrFS uses
 Flickcurl to talk with Flickr. You must setup ~/.flickcurl.conf as follows:
 
-$ cat ~/.flickcurl.conf
+$ nano ~/.flickcurl.conf
 [flickr]
 api_key=2e66493ec959256a79e4e5a3da7df729
 secret=c1b99d47790391c3
@@ -33,7 +61,7 @@ This will allow the user the ability to link their Flickr account with FlickrFS.
 The user will be given a 9-digit FROB that can be given to the flickcurl api to
 link the user's account to the interface. Finally, execute:
 
-flickcurl -a 123-456-789
+$ flickcurl -a 123-456-789
 
 where 123-456-789 is the 9-digit FROB given to the user above. This will finish
 the linking of the user's account with the flickcurl API and library and the
