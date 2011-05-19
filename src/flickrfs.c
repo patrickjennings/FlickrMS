@@ -233,6 +233,7 @@ static int ffs_open(const char *path, struct fuse_file_info *fi) {
 	char *photoset;
 	const char *uri;
 	char *wget_path;
+	int fd;
 
 	if(split_path(path, &photoset, &photo))
 		return FAIL;
@@ -247,19 +248,20 @@ static int ffs_open(const char *path, struct fuse_file_info *fi) {
 	strcat(wget_path, tmp_path);
 	strcat(wget_path, "/");
 	strcat(wget_path, photoset);
-	mkdir(wget_path, PERMISSIONS);	/* Create photoset directory if it doesn't exist */
+	mkdir(wget_path, PERMISSIONS);		/* Create photoset directory if it doesn't exist */
 
 	strcpy(wget_path, tmp_path);
 	strcat(wget_path, path);
 	if(wget(uri, wget_path) < 0)		/* Get the image from flickr and put it into the tmp dir */
 		return FAIL;
 
-	fi->fh = open(wget_path, fi->flags);
+	fd = open(wget_path, fi->flags);
+	fi->fh = fd;
 
 	free(wget_path);
 	free(photoset);
 	free(photo);
-	return SUCCESS;
+	return (fd < 0)?FAIL:SUCCESS;
 }
 
 static int ffs_read(const char *path, char *buf, size_t size,
@@ -272,9 +274,10 @@ static int ffs_write(const char *path, const char *buf, size_t size,
   off_t offset, struct fuse_file_info *fi) {
 	(void)path;
 	(void)buf;
+	(void)size;
 	(void)offset;
 	(void)fi;
-	return size;
+	return 0;
 }
 
 /**
