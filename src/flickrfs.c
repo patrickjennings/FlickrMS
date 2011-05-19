@@ -253,10 +253,15 @@ static int ffs_open(const char *path, struct fuse_file_info *fi) {
 
 	wget_path = (char *)malloc(strlen(tmp_path) + strlen(path) + 1);
 	wget_path[0] = '\0';
-	strcat(wget_path, tmp_path);
-	strcat(wget_path, path);
 
-	wget(uri, wget_path);
+	strcat(wget_path, tmp_path);
+	strcat(wget_path, "/");
+	strcat(wget_path, photoset);
+	mkdir(wget_path, PERMISSIONS);	/* Create photoset directory if it doesn't exist */
+
+	strcpy(wget_path, tmp_path);
+	strcat(wget_path, path);
+	wget(uri, wget_path);		/* Get the image from flickr and put it into the tmp dir */
 
 	free(wget_path);
 	free(photoset);
