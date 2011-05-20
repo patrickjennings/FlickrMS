@@ -19,5 +19,6 @@ const cached_information *photoset_lookup(const char *photoset);
 const cached_information *photo_lookup(const char *photoset, const char *photo);
 const char *get_photo_uri(const char *photoset, const char *photo);
 int set_photo_name(const char *photoset, const char *photo, const char *newname);
+int set_photo_size(const char *photoset, const char *photo, unsigned int newsize);
 
 #endif

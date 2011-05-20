@@ -58,7 +58,7 @@ static int split_path(const char *path, char **photoset, char **photo) {
 	path_dup = strdup(path + 1);
 	i = slash_index(path_dup);
 
-	if(!path || !photoset || !(*photoset) || !photo || !(*photo) || !path_dup)
+	if(!path || !photoset || !photo || !path_dup)
 	  	return FAIL;
 
 	if(i >= 0) {
@@ -234,6 +234,7 @@ static int ffs_open(const char *path, struct fuse_file_info *fi) {
 	const char *uri;
 	char *wget_path;
 	int fd;
+	struct stat buf;
 
 	if(split_path(path, &photoset, &photo))
 		return FAIL;
@@ -257,6 +258,10 @@ static int ffs_open(const char *path, struct fuse_file_info *fi) {
 
 	fd = open(wget_path, fi->flags);
 	fi->fh = fd;
+
+	if(stat(wget_path, &buf))
+		return FAIL;
+	set_photo_size(photoset, photo, buf.st_size);
 
 	free(wget_path);
 	free(photoset);

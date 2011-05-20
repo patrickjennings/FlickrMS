@@ -245,6 +245,7 @@ static int check_photoset_cache(cached_photoset *cps) {
 		cp->uri = strdup(flickcurl_photo_as_source_uri(fp[j], GET_PHOTO_SIZE));
 		cp->ci.name = strdup(fp[j]->fields[PHOTO_FIELD_title].string);
 		cp->ci.id = strdup(fp[j]->id);
+		cp->ci.size = 1024;	/* Trick so that file managers do not think file is empty... */
 
 		sscanf(fp[j]->fields[PHOTO_FIELD_dates_taken].string, "%d-%d-%d %d:%d:%d",
 		  &(tm.tm_year), &(tm.tm_mon), &(tm.tm_mday), &(tm.tm_hour), &(tm.tm_min), &(tm.tm_sec));
@@ -486,4 +487,13 @@ int set_photo_name(const char *photoset, const char *photo, const char *newname)
 /*int set_photo_photoset(const char *oldset, const char *newset, const char *photo) {
 	
 }*/
+
+/* Sets the photos size */
+int set_photo_size(const char *photoset, const char *photo, unsigned int newsize) {
+	cached_photo *cp;
+	if(!(cp = get_photo(photoset, photo)))
+		return FAIL;
+	cp->ci.size = newsize;
+	return SUCCESS;
+}
 
