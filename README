@@ -38,13 +38,28 @@ let them be known at the following URL:
 https://github.com/patrickjennings/FlickrFS/issues
 
 
-==Configuration==
+==Installation==
 Dependencies:
 	FUSE (tested on fuse-2.8.5)
 		http://fuse.sourceforge.net/
 	>=Flickcurl-1.21
 		http://librdf.org/flickcurl/
 
+FlickrFS comes with a custom Makefile that can be used to create the binary
+application. To compile and create the binary, simply type:
+
+$ make
+
+To install the binary, type:
+
+$ sudo make install
+
+To uninstall, simply type:
+
+$ sudo make uninstall
+
+
+==Configuration==
 You must allow FlickrFS access to your Flickr account. This is done via the Flickr API
 and communication through Flickcurl. You must setup ~/.flickcurl.conf as follows:
 
@@ -79,21 +94,6 @@ $
 See http://librdf.org/flickcurl/ for more information on Flickrcurl API
 configuration and http://www.flickr.com/services/apps/72157623762128193/
 for the info on the api key and secret of FlickrFS.
-
-
-==Installation==
-FlickrFS comes with a custom Makefile that can be used to create the binary
-application. To compile and create the binary, simply type:
-
-$ make
-
-To install the binary, type:
-
-$ sudo make install
-
-To uninstall, simply type:
-
-$ sudo make uninstall
 
 
 ==Usage==
