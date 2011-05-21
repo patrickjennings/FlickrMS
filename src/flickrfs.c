@@ -244,17 +244,18 @@ static int ffs_open(const char *path, struct fuse_file_info *fi) {
 		return FAIL;
 
 	wget_path = (char *)malloc(strlen(tmp_path) + strlen(path) + 1);
-	wget_path[0] = '\0';
-
-	strcat(wget_path, tmp_path);
+	strcpy(wget_path, tmp_path);
 	strcat(wget_path, "/");
 	strcat(wget_path, photoset);
-	mkdir(wget_path, PERMISSIONS);		/* Create photoset directory if it doesn't exist */
+	mkdir(wget_path, PERMISSIONS);		/* Create photoset temp directory if it doesn't exist */
 
 	strcpy(wget_path, tmp_path);
 	strcat(wget_path, path);
-	if(wget(uri, wget_path) < 0)		/* Get the image from flickr and put it into the tmp dir */
-		return FAIL;
+
+	if(stat(wget_path, &buf)) {
+		if(wget(uri, wget_path) < 0)	/* Get the image from flickr and put it into the temp dir if it doesn't already exist. */
+			return FAIL;
+	}
 
 	fd = open(wget_path, fi->flags);
 	fi->fh = fd;
