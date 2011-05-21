@@ -29,5 +29,11 @@ cache.o: cache.c
 wget.o: wget.c
 	$(CC) $(CFLAGS) $(CURLINC) -c $<
 
+install:
+	cp flickrfs /usr/local/bin/
+
+uninstall:
+	rm /usr/local/bin/flickrfs
+
 clean:
 	rm -rf $(OBJS) $(PROJ)

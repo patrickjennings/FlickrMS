@@ -2,6 +2,7 @@
 Created by:	Patrick Jennings
 Website:	https://github.com/patrickjennings/FlickrFS
 
+
 ==About==
 Are you tired of spending a significant amount of time messing around with the
 Flickr website? Are you sick of seeing advertisements on every page you load?
@@ -19,12 +20,12 @@ or editors to access your Flickr photos!
 
 Photos will be placed in directories that represent which photoset the photo
 belongs to. If a photo does not belong to a photoset, the photo will appear in
-the root director. A photo that has an empty name in Flickr, will display its
+the root directory. A photo that has an empty name in Flickr, will display its
 Flickr photo id instead. All of this is to ensure that all of your photos will be
 organized the way you intended and are perfectly viewable from the file system.
 
 The application is written in C and was designed for efficiency and compatability.
-It will run on any POSIX complient machine. This means all UNIX-based and BSD-based
+It will run on any POSIX compliant machine. This means all UNIX-based and BSD-based
 machines should be supported. The application will use the lowest amount of resources
 possible. Obviously, this application will use your Flickr account to store photos so
 no persistent storage is necessary. The internal caching mechanism dynamically grows
@@ -36,15 +37,16 @@ will be tested for bugs and UI malfunctions. If you find any pressing concerns, 
 let them be known at the following URL:
 https://github.com/patrickjennings/FlickrFS/issues
 
-==INSTALLATION==
+
+==Configuration==
 Dependencies:
 	FUSE (tested on fuse-2.8.5)
 		http://fuse.sourceforge.net/
 	>=Flickcurl-1.21
 		http://librdf.org/flickcurl/
 
-You must allow the access of FlickrFS to your Flickr account. FlickrFS uses
-Flickcurl to talk with Flickr. You must setup ~/.flickcurl.conf as follows:
+You must allow FlickrFS access to your Flickr account. This is done via the Flickr API
+and communication through Flickcurl. You must setup ~/.flickcurl.conf as follows:
 
 $ nano ~/.flickcurl.conf
 [flickr]
@@ -78,9 +80,39 @@ See http://librdf.org/flickcurl/ for more information on Flickrcurl API
 configuration and http://www.flickr.com/services/apps/72157623762128193/
 for the info on the api key and secret of FlickrFS.
 
-FlickrFS comes with a custom Makefile that can be used to create the binary
-application.
 
+==Installation==
+FlickrFS comes with a custom Makefile that can be used to create the binary
+application. To compile and create the binary, simply type:
+
+$ make
+
+To install the binary, type:
+
+$ sudo make install
+
+To uninstall, simply type:
+
+$ sudo make uninstall
+
+
+==Usage==
+To mount, execute:
+
+$ flickrfs mountDir/
+
+This mounts the file system onto the empty directory 'mountDir'. Then
+the you will be able to navigate into 'mountDir' and directly access
+your Flickr photos! You will then be able to interact with the files
+and folders just like if they were on your local computer.
+
+To unmount, execute:
+
+$ fusermount -u mountDir/
+
+This will remove the file system from the 'mountDir' directory. If you
+navigate into 'mountDir' you will notice that your Flickr photos will
+no longer be visible.
 
 
 ==Q/A==
