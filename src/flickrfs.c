@@ -6,8 +6,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
-#include <pwd.h>
-#include <sys/types.h>
 #include <unistd.h>
 
 #include "cache.h"
@@ -80,13 +78,8 @@ static int split_path(const char *path, char **photoset, char **photo) {
  * uid/gid. Want to only give the user access to their flickr account.
  */
 static inline int setUser() {
-	struct passwd *pw;
-	if(!(pw = getpwnam(getenv("USER"))))
-		return FAIL;
-
-	uid = pw->pw_uid;
-	gid = pw->pw_gid;
-
+	uid = getuid();
+	gid = getgid();
 	return SUCCESS;
 }
 
@@ -101,10 +94,12 @@ static inline int setTMPDir() {
 		return FAIL;
 
 	tmp_path = (char *)malloc(strlen(home) + strlen(TMP_DIR_NAME) + 2);
-
 	if(!tmp_path)
 		return FAIL;
-	sprintf(tmp_path, "%s/%s", home, TMP_DIR_NAME);
+
+	strcpy(tmp_path, home);
+	strcat(tmp_path, "/");
+	strcat(tmp_path, TMP_DIR_NAME);
 
 	return 0 - mkdir(tmp_path, PERMISSIONS);
 }

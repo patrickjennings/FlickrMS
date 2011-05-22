@@ -102,6 +102,8 @@ static int flickr_init() {
 		return FAIL;
 
 	conf_path = get_conf_path();
+	if(!conf_path)
+		return FAIL;
 
 	/* Read from the config file, ~/.flickcurl.conf */
 	if(read_ini_config(conf_path, "flickr", fc, read_conf))
@@ -154,6 +156,10 @@ static int new_cached_photoset(cached_photoset **cps, char *name, char *id) {
 /* All of our keys and values will be dynamic so we will want to free them. */
 static gboolean free_photo_ht(gpointer key, gpointer value, gpointer user_data) {
 	(void)user_data;
+	cached_photo *cp = value;
+	free(cp->uri);
+	free(cp->ci.name);
+	free(cp->ci.id);
 	free(key);
 	free(value);
 	return TRUE;
@@ -162,8 +168,12 @@ static gboolean free_photo_ht(gpointer key, gpointer value, gpointer user_data) 
 /* All of our keys and values will be dynamic so we will want to free them. */
 static gboolean free_photoset_ht(gpointer key, gpointer value, gpointer user_data) {
 	(void)user_data;
+	cached_photoset *cps = value;
 	free(key);
-	g_hash_table_foreach_remove(((cached_photoset *)value)->photo_ht, free_photo_ht, NULL);
+	g_hash_table_foreach_remove(cps->photo_ht, free_photo_ht, NULL);
+	g_hash_table_destroy(cps->photo_ht);
+	free(cps->ci.name);
+	free(cps->ci.id);
 	free(value);
 	return TRUE;
 }
@@ -188,7 +198,7 @@ static int check_cache() {
 		return FAIL;
 
 	cached_nophotoset = cps;
-	g_hash_table_insert(photoset_ht, g_strdup(""), cps);
+	g_hash_table_insert(photoset_ht, strdup(""), cps);
 
 	if(!(fps = flickcurl_photosets_getList(fc, NULL)))
 		return FAIL;
@@ -197,7 +207,7 @@ static int check_cache() {
 	for(i = 0; fps[i]; i++) {
 		if(new_cached_photoset(&cps, fps[i]->title, fps[i]->id))
 			return FAIL;
-		g_hash_table_insert(photoset_ht, g_strdup(cps->ci.name), cps);
+		g_hash_table_insert(photoset_ht, strdup(cps->ci.name), cps);
 	}
 	flickcurl_free_photosets(fps);
 
@@ -238,7 +248,7 @@ static int check_photoset_cache(cached_photoset *cps) {
 
 		if(!(cp = (cached_photo *)malloc(sizeof(cached_photo))))
 			return FAIL;
-		cp->uri = strdup(flickcurl_photo_as_source_uri(fp[j], GET_PHOTO_SIZE));
+		cp->uri = flickcurl_photo_as_source_uri(fp[j], GET_PHOTO_SIZE);
 		cp->ci.name = strdup(fp[j]->fields[PHOTO_FIELD_title].string);
 		cp->ci.id = strdup(fp[j]->id);
 		cp->ci.size = 1024;	/* Trick so that file managers do not think file is empty... */
@@ -355,35 +365,31 @@ int get_photo_names(const char *photoset, char ***names) {
 		return FAIL;
 
 	pthread_mutex_lock(&cache_lock);
-	if(check_cache()) {
-		pthread_mutex_unlock(&cache_lock);
-		return FAIL;
-	}
+	if(check_cache())
+		goto fail;
 
 	/* If the photoset is not found in the cache, return */
-	if(!(cps = g_hash_table_lookup(photoset_ht, photoset))) {
-		pthread_mutex_unlock(&cache_lock);
-		return FAIL;
-	}
+	if(!(cps = g_hash_table_lookup(photoset_ht, photoset)))
+		goto fail;
 
-	if(check_photoset_cache(cps)) {
-		pthread_mutex_unlock(&cache_lock);
-		return FAIL;
-	}
+	if(check_photoset_cache(cps))
+		goto fail;
 
 	size = g_hash_table_size(cps->photo_ht);
 
-	if(!(*names = (char **)malloc(sizeof(char *) * size))) {
-		pthread_mutex_unlock(&cache_lock);
-		return FAIL;
-	}
+	if(!(*names = (char **)malloc(sizeof(char *) * size)))
+		goto fail;
 
 	/* Add each photo to the list. We add the keys since the names may be duplicates/NULL */
 	g_hash_table_iter_init(&iter, cps->photo_ht);
 	for(i = 0; g_hash_table_iter_next(&iter, (gpointer)&key, NULL); i++)
 			(*names)[i] = key;
+
 	pthread_mutex_unlock(&cache_lock);
 	return size;
+
+fail:	pthread_mutex_unlock(&cache_lock);
+	return FAIL;
 }
 
 /* Looks for the photoset specified in the argument.
@@ -410,28 +416,27 @@ const cached_information *photoset_lookup(const char *photoset) {
  * Internal method to get the cached_photo of
  * a particular photo.
  */
-static cached_photo *get_photo(const char *photoset, const char *photo) {
+cached_photo *get_photo(const char *photoset, const char *photo) {
 	cached_photoset *cps;
 	cached_photo *cp;
 
 	pthread_mutex_lock(&cache_lock);
-	if(check_cache()) {
-		pthread_mutex_unlock(&cache_lock);
-		return 0;
-	}
+	if(check_cache())
+		goto fail;
 
-	if(!(cps = g_hash_table_lookup(photoset_ht, photoset))) {
-		pthread_mutex_unlock(&cache_lock);
-		return 0;
-	}
+	if(!(cps = g_hash_table_lookup(photoset_ht, photoset)))
+		goto fail;
 
-	if(check_photoset_cache(cps)) {
-		pthread_mutex_unlock(&cache_lock);
-		return 0;
-	}
+	if(check_photoset_cache(cps))
+		goto fail;
+
 	cp = g_hash_table_lookup(cps->photo_ht, photo);
+
 	pthread_mutex_unlock(&cache_lock);
 	return cp;
+
+fail:	pthread_mutex_unlock(&cache_lock);
+	return 0;
 }
 
 /* Looks for the photo specified in the arguments.
