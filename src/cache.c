@@ -15,11 +15,10 @@
 #include <pthread.h>
 
 #include "cache.h"
+#include "conf.h"
 
 
 #define DEFAULT_CACHE_TIMEOUT	30
-#define BUFFER_SIZE		1024
-#define CONF_FILE_NAME		".flickcurl.conf"
 
 #define GET_PHOTO_SIZE		's'
 
@@ -93,30 +92,27 @@ static void read_conf(void* userdata, const char* key, const char* value) {
  * Initialize the flickcurl connection
 */
 static int flickr_init() {
-	char* home;
-	char config_path[BUFFER_SIZE];
+	char *conf_path;
 	char *login;
 
 	flickcurl_init();
 	fc = flickcurl_new();
-        
-	home = getenv("HOME");
-	/* Buffer overflow protection. no home directory paths greater than so many chars. */
-	if(home && (strlen(home) < (BUFFER_SIZE - 20)))
-		sprintf(config_path, "%s/%s", home, CONF_FILE_NAME);
-	else
+
+	if(check_conf_file())
 		return FAIL;
 
-	/* Read from the config file: ~/.flickcurl.conf */
-	if(read_ini_config(config_path, "flickr", fc, read_conf))
+	conf_path = get_conf_path();
+
+	/* Read from the config file, ~/.flickcurl.conf */
+	if(read_ini_config(conf_path, "flickr", fc, read_conf))
 		return FAIL;
 
 	login = flickcurl_test_login(fc);
-
 	if(!login)
 		return FAIL;
 
 	free(login);
+	free(conf_path);
 	return SUCCESS;
 }
 

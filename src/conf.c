@@ -1,12 +1,18 @@
+#include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <stdio.h>
 
 #include "conf.h"
 
 #define FAIL	-1
 #define SUCCESS	0
 
-static char conf_file_name[15] = ".flickcurl.conf";
+#define KEY	"2e66493ec959256a79e4e5a3da7df729"
+#define SECRET	"c1b99d47790391c3"
+#define	URL	"http://www.flickr.com/services/auth/?mobile=1&api_key=2e66493ec959256a79e4e5a3da7df729&perms=delete&api_sig=6417abca6880d676c010600e8c65a045"
+
+static char conf_file_name[] = ".flickcurl.conf";
 
 char *get_conf_path() {
         char *conf_path;
@@ -26,6 +32,9 @@ char *get_conf_path() {
 }
 
 int create_conf(char *conf_path) {
+	#define FROB_SIZE 12
+	char FROB[FROB_SIZE];
+	char command[25] = "flickcurl -a ";
 	FILE *fp;
 
 	if(!conf_path)
@@ -34,24 +43,32 @@ int create_conf(char *conf_path) {
 	if(!fp)
 		return FAIL;
 
-	fputs("[flickr]\napi_key=2e66493ec959256a79e4e5a3da7df729\nsecret=c1b99d47790391c3"
-		,fp);
-	
+	fputs("[flickr]\napi_key=" KEY "\nsecret=" SECRET "\n", fp);
 	fclose(fp);
+
+	fputs("Go to " URL "\nPaste the application code here:\n", stdout);
+
+	if(!fgets(FROB, FROB_SIZE, stdin))
+		return FAIL;
+
+	strcat(command, FROB);
+	printf("%s\n", command);
+	system(command);
+
 	return SUCCESS;
 }
 
 int check_conf_file() {
 	char *conf_path;
-	struct stat buf;
 
 	conf_path = get_conf_path();
 	if(!conf_path)
 		return FAIL;
-	if(access(conf_path, F_OK) < 0)
+	if(access(conf_path, F_OK) < 0)	/* If conf file doesn't exist, create and ask for new frob */
 		if(create_conf(conf_path))
 			return FAIL;
 
 	free(conf_path);
 	return SUCCESS;
 }
+
