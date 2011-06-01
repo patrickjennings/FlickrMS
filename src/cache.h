@@ -1,6 +1,8 @@
 #ifndef CACHE_H
 #define CACHE_H
 
+#include "common.h"
+
 typedef struct {
 	char *name;
 	char *id;
@@ -15,9 +17,10 @@ void flickr_cache_kill();
 int photoDelete(char *photo_id);
 int get_photoset_names(char ***names);
 int get_photo_names(const char *photoset, char ***names);
-const cached_information *photoset_lookup(const char *photoset);
-const cached_information *photo_lookup(const char *photoset, const char *photo);
-const char *get_photo_uri(const char *photoset, const char *photo);
+cached_information *photoset_lookup(const char *photoset);
+cached_information *photo_lookup(const char *photoset, const char *photo);
+void free_cached_info(cached_information *ci);
+char *get_photo_uri(const char *photoset, const char *photo);
 int set_photo_name(const char *photoset, const char *photo, const char *newname);
 int set_photo_size(const char *photoset, const char *photo, unsigned int newsize);
 

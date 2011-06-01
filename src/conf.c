@@ -5,14 +5,14 @@
 
 #include "conf.h"
 
-#define FAIL	-1
-#define SUCCESS	0
 
 #define KEY	"2e66493ec959256a79e4e5a3da7df729"
 #define SECRET	"c1b99d47790391c3"
 #define	URL	"http://www.flickr.com/services/auth/?mobile=1&api_key=2e66493ec959256a79e4e5a3da7df729&perms=delete&api_sig=6417abca6880d676c010600e8c65a045"
 
+
 static char conf_file_name[] = ".flickcurl.conf";
+
 
 char *get_conf_path() {
         char *conf_path;

@@ -2,8 +2,7 @@
 #include <string.h>
 #include <curl/curl.h>
 
-#define SUCCESS	0
-#define FAIL	-1
+#include "wget.h"
 
 size_t write(void *ptr, size_t size, size_t nmemb, FILE *stream) {
 	return fwrite(ptr, size, nmemb, stream);

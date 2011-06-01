@@ -20,13 +20,10 @@
 
 #define DEFAULT_CACHE_TIMEOUT	30
 
-#define GET_PHOTO_SIZE		's'
+#define GET_PHOTO_SIZE		'l'
 
 #define CACHE_UNSET		0
 #define CACHE_SET		1
-
-#define SUCCESS			0
-#define FAIL			-1
 
 
 typedef struct {
@@ -153,6 +150,24 @@ static int new_cached_photoset(cached_photoset **cps, char *name, char *id) {
 	return 0;
 }
 
+static cached_information *copy_cached_info(const cached_information *ci) {
+	cached_information *newci = ci?(cached_information *)malloc(sizeof(cached_information)):0;
+	if(!newci)
+		return 0;
+	*newci = *ci;
+	newci->name = strdup(ci->name);
+	newci->id = strdup(ci->id);
+	return newci;
+}
+
+void free_cached_info(cached_information *ci) {
+	if(ci) {
+		free(ci->name);
+		free(ci->id);
+		free(ci);
+	}
+}
+
 /* All of our keys and values will be dynamic so we will want to free them. */
 static gboolean free_photo_ht(gpointer key, gpointer value, gpointer user_data) {
 	(void)user_data;
@@ -216,6 +231,12 @@ static int check_cache() {
 	return SUCCESS;
 }
 
+/*
+ * The photosets are filled dynamically based on which photosets are loaded
+ * (it would be a waste to load all flickr info if not needed).
+ * This method needs to be called in order to fill the photoset cache
+ * with photo information.
+ */
 static int check_photoset_cache(cached_photoset *cps) {
 	flickcurl_photo **fp;
 	int j;
@@ -226,9 +247,6 @@ static int check_photoset_cache(cached_photoset *cps) {
 		return FAIL;
 	if(cps->set)
 		return SUCCESS;
-
-	if(check_cache())
-		return FAIL;
 
 	/* Are we searching for photos in a photoset or not? */
 	if(cps == cached_nophotoset) {		/* Get photos NOT in a photoset */
@@ -282,7 +300,6 @@ static int check_photoset_cache(cached_photoset *cps) {
  * mechanism.
 */
 int flickr_cache_init() {
-	g_thread_init(NULL);
 	if(flickr_init())
 		return FAIL;
 	photoset_ht = g_hash_table_new(g_str_hash, g_str_equal);
@@ -340,7 +357,7 @@ int get_photoset_names(char ***names) {
 	i = 0;
 	while(g_hash_table_iter_next(&iter, (gpointer)&key, NULL)) {
 		if(key && strcmp(key, "")) {
-			(*names)[i] = key;
+			(*names)[i] = strdup(key);
 			i++;
 		}
 	}
@@ -383,7 +400,7 @@ int get_photo_names(const char *photoset, char ***names) {
 	/* Add each photo to the list. We add the keys since the names may be duplicates/NULL */
 	g_hash_table_iter_init(&iter, cps->photo_ht);
 	for(i = 0; g_hash_table_iter_next(&iter, (gpointer)&key, NULL); i++)
-			(*names)[i] = key;
+			(*names)[i] = strdup(key);
 
 	pthread_mutex_unlock(&cache_lock);
 	return size;
@@ -396,92 +413,91 @@ fail:	pthread_mutex_unlock(&cache_lock);
  * Returns pointer to the stored cached_information
  * or 0 if not found.
  */
-const cached_information *photoset_lookup(const char *photoset) {
+cached_information *photoset_lookup(const char *photoset) {
 	cached_photoset *cps;
+	cached_information *ci_copy = 0;
 
 	pthread_mutex_lock(&cache_lock);
-	if(check_cache()) {
-		pthread_mutex_unlock(&cache_lock);
-		return 0;
-	}
+	if(check_cache())
+		goto end;
+
 	cps = g_hash_table_lookup(photoset_ht, photoset);
-	pthread_mutex_unlock(&cache_lock);
 	if(cps)
-		return &(cps->ci);
-	else
-		return 0;
+		ci_copy = copy_cached_info(&(cps->ci));
+
+end:	pthread_mutex_unlock(&cache_lock);
+	return ci_copy;
 }
 
 /*
  * Internal method to get the cached_photo of
  * a particular photo.
  */
-cached_photo *get_photo(const char *photoset, const char *photo) {
+static cached_photo *get_photo(const char *photoset, const char *photo) {
 	cached_photoset *cps;
 	cached_photo *cp;
 
-	pthread_mutex_lock(&cache_lock);
 	if(check_cache())
-		goto fail;
+		return 0;
 
 	if(!(cps = g_hash_table_lookup(photoset_ht, photoset)))
-		goto fail;
+		return 0;
 
 	if(check_photoset_cache(cps))
-		goto fail;
+		return 0;
 
 	cp = g_hash_table_lookup(cps->photo_ht, photo);
 
-	pthread_mutex_unlock(&cache_lock);
 	return cp;
-
-fail:	pthread_mutex_unlock(&cache_lock);
-	return 0;
 }
 
 /* Looks for the photo specified in the arguments.
  * Returns pointer to the stored cached_information
  * or 0 if not found.
  */
-const cached_information *photo_lookup(const char *photoset, const char *photo) {
+cached_information *photo_lookup(const char *photoset, const char *photo) {
 	cached_photo *cp;
+	cached_information *ci_copy = 0;
+
+	pthread_mutex_lock(&cache_lock);
 	if((cp = get_photo(photoset, photo)))
-		return &(cp->ci);
-	else
-		return 0;
+		ci_copy = copy_cached_info(&(cp->ci));
+	pthread_mutex_unlock(&cache_lock);
+
+	return ci_copy;
 }
 
 /* Returns the URI used to get the actual image of
  * picture.
  */
-const char *get_photo_uri(const char *photoset, const char *photo) {
+char *get_photo_uri(const char *photoset, const char *photo) {
 	cached_photo *cp;
+	char *uri_copy = 0;	
+
+	pthread_mutex_lock(&cache_lock);
 	if((cp = get_photo(photoset, photo)))
-		return cp->uri;
-	else
-		return 0;
+		uri_copy = strdup(cp->uri);	
+	pthread_mutex_unlock(&cache_lock);
+
+	return uri_copy;
 }
 
 /* Renames the photo specified in the args to the
  * new name.
  */
 int set_photo_name(const char *photoset, const char *photo, const char *newname) {
-	const cached_information *ci;
+	cached_information *ci;
 	int ret;
 
 	if(!strcmp(photo, newname))
 		return SUCCESS;
 	
-	pthread_mutex_lock(&cache_lock);
-	if(!(ci = photo_lookup(photoset, photo))) {
-		pthread_mutex_unlock(&cache_lock);
+	if(!(ci = photo_lookup(photoset, photo)))
 		return FAIL;
-	}
 
 	ret = flickcurl_photos_setMeta(fc, ci->id, newname, "");
 	last_cleaned = 0;
-	pthread_mutex_unlock(&cache_lock);
-
+	free_cached_info(ci);
 	return ret;
 }
 
