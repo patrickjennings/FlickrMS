@@ -151,11 +151,11 @@ static int fms_getattr(const char *path, struct stat *stbuf) {
 				photoset[index] = '\0';
 
 				ci = photo_lookup(photoset, lookup_path + index + 1);
-				free(photoset);
 				if(ci) {
 					set_stbuf(stbuf, S_IFREG | PERMISSIONS, uid, gid, ci->size, ci->time, 1);
 					retval = SUCCESS;
 				}
+				free(photoset);
 			}
 		}
 		free_cached_info(ci);
@@ -194,12 +194,6 @@ static int fms_readdir(const char *path, void *buf,
 	}
 	free(names);
 
-	return SUCCESS;
-}
-
-static int fms_mkdir(const char *path, mode_t mode) {
-	(void)mode;
-	printf("Path: %s\n", path);
 	return SUCCESS;
 }
 
@@ -257,16 +251,13 @@ static int fms_open(const char *path, struct fuse_file_info *fi) {
 	strcat(wget_path, path);
 
 	if(access(wget_path, F_OK)) {
-		printf("access failed! %d\n\n\n", access(wget_path, F_OK));
 		if(wget(uri, wget_path) < 0)	/* Get the image from flickr and put it into the temp dir if it doesn't already exist. */
 			return FAIL;
 	}
 
 	if(stat(wget_path, &st_buf))
 		return FAIL;
-	printf("%ld %ld %ld\n\n\n\n", time(NULL), st_buf.st_mtime,
-		(time(NULL) - st_buf.st_mtime));
-	
+
 	if((time(NULL) - st_buf.st_mtime) >= 1200) {
 		if(wget(uri, wget_path) < 0)
 			return FAIL;
@@ -321,6 +312,33 @@ static int fms_release(const char *path, struct fuse_file_info *fi) {
 	return SUCCESS;
 }
 
+static int fms_create(const char *path, mode_t mode, struct fuse_file_info *fi) {
+	int fd;
+	char *tmp_scrath_path;
+
+	tmp_scrath_path = (char *)malloc(strlen(tmp_path) + strlen(path) + 1);
+	strcpy(tmp_scrath_path, tmp_path);
+	strcat(tmp_scrath_path, path);
+
+	fd = creat(tmp_scrath_path, mode);
+	fi->fh = fd;
+
+	free(tmp_scrath_path);
+	return (fd < 0)?FAIL:SUCCESS;
+}
+
+/* Only called after create. For new files. */
+static int fms_fgetattr(const char *path, struct stat *stbuf, struct fuse_file_info *fi) {
+	(void)path;
+	return fstat(fi->fh, stbuf);
+}
+
+static int fms_mkdir(const char *path, mode_t mode) {
+	(void)mode, (void)path;
+	return FAIL;
+}
+
+
 /**
  * Main function
 **/
@@ -329,13 +347,15 @@ static int fms_release(const char *path, struct fuse_file_info *fi) {
 static struct fuse_operations flickrms_oper = {
 	.getattr = fms_getattr,
 	.readdir = fms_readdir,
-	.mkdir = fms_mkdir,
 	.open = fms_open,
 	.read = fms_read,
 	.write = fms_write,
 	.flush = fms_flush,
 	.release = fms_release,
-	.rename = fms_rename
+	.rename = fms_rename,
+	.create = fms_create,
+	.fgetattr = fms_fgetattr,
+	.mkdir = fms_mkdir
 };
 
 int main(int argc, char *argv[]) {
