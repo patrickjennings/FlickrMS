@@ -7,10 +7,10 @@
 #include <string.h>
 #include <errno.h>
 #include <unistd.h>
+#include <time.h>
 
 #include "cache.h"
 #include "wget.h"
-#include "file_manager.h"
 
 
 #define PERMISSIONS	0755
@@ -240,7 +240,7 @@ static int ffs_open(const char *path, struct fuse_file_info *fi) {
 	char *uri;
 	char *wget_path;
 	int fd;
-	struct stat buf;
+	struct stat st_buf;
 
 	if(split_path(path, &photoset, &photo))
 		return FAIL;
@@ -256,15 +256,25 @@ static int ffs_open(const char *path, struct fuse_file_info *fi) {
 	strcpy(wget_path, tmp_path);
 	strcat(wget_path, path);
 
-	if(stat(wget_path, &buf)) {
+	if(access(wget_path, F_OK)) {
+		printf("access failed! %d\n\n\n", access(wget_path, F_OK));
 		if(wget(uri, wget_path) < 0)	/* Get the image from flickr and put it into the temp dir if it doesn't already exist. */
 			return FAIL;
 	}
-	if(stat(wget_path, &buf))
+
+	if(stat(wget_path, &st_buf))
 		return FAIL;
+	printf("%ld %ld %ld\n\n\n\n", time(NULL), st_buf.st_mtime,
+		(time(NULL) - st_buf.st_mtime));
+	
+	if((time(NULL) - st_buf.st_mtime) >= 1200) {
+		if(wget(uri, wget_path) < 0)
+			return FAIL;
+	}
+
 	fd = open(wget_path, fi->flags);
 	fi->fh = fd;
-	set_photo_size(photoset, photo, buf.st_size);
+	set_photo_size(photoset, photo, st_buf.st_size);
 
 	free(uri);
 	free(wget_path);
@@ -287,8 +297,7 @@ static int ffs_write(const char *path, const char *buf, size_t size,
 
 static int ffs_flush(const char *path, struct fuse_file_info *fi) {
 	(void)path;
-	close(fi->fh);
-	return SUCCESS;
+	return close(fi->fh);
 }
 
 static int ffs_release(const char *path, struct fuse_file_info *fi) {
@@ -301,8 +310,7 @@ static int ffs_release(const char *path, struct fuse_file_info *fi) {
 	tmp_scrath_path = (char *)malloc(strlen(tmp_path) + strlen(path) + 1);
 	strcpy(tmp_scrath_path, tmp_path);
 	strcat(tmp_scrath_path, path);
-	// Upload file here...
-	add_file(tmp_scrath_path);
+	// TODO: Upload file here...
 
 	set_photoset_tmp_dir(tmp_scrath_path, tmp_path, photoset);
 	rmdir(tmp_scrath_path);
@@ -339,13 +347,10 @@ int main(int argc, char *argv[]) {
 		return ret;
 	if((ret = flickr_cache_init()))
 		return ret;
-	if((ret = file_manager_init()))
-		return ret;
 
 	ret = fuse_main(argc, argv, &flickrfs_oper, NULL);
 
 	flickr_cache_kill();
-	file_manager_kill();
 	free(tmp_path);
 	return ret;
 }
