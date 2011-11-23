@@ -38,10 +38,10 @@ typedef struct {
 } cached_photo;
 
 
-static GHashTable *photoset_ht;			/* The photoset cache */
+static GHashTable *photoset_ht;			    /* The photoset cache */
 static cached_photoset *cached_nophotoset;	/* A pointer to the cached information of photos NOT in a photoset */
-static pthread_mutex_t cache_lock;		/* To make thread safe */
-static time_t last_cleaned;			/* To age/invalidate the cache */
+static pthread_mutex_t cache_lock;		    /* To make thread safe */
+static time_t last_cleaned;			        /* To age/invalidate the cache */
 
 static flickcurl *fc;
 
@@ -173,25 +173,42 @@ void free_cached_info(cached_information *ci) {
 static gboolean free_photo_ht(gpointer key, gpointer value, gpointer user_data) {
 	(void)user_data;
 	cached_photo *cp = value;
-	free(cp->uri);
-	free(cp->ci.name);
-	free(cp->ci.id);
-	free(key);
-	free(value);
-	return TRUE;
+
+    if( cp->ci.dirty ) {
+        free(cp->uri);
+        free(cp->ci.name);
+        free(cp->ci.id);
+        free(key);
+        free(value);
+        return TRUE;
+    }
+    else {
+        return FALSE;
+    }
 }
 
 /* All of our keys and values will be dynamic so we will want to free them. */
 static gboolean free_photoset_ht(gpointer key, gpointer value, gpointer user_data) {
+    GHashTable *photo_ht;
 	(void)user_data;
+
 	cached_photoset *cps = value;
-	free(key);
-	g_hash_table_foreach_remove(cps->photo_ht, free_photo_ht, NULL);
-	g_hash_table_destroy(cps->photo_ht);
-	free(cps->ci.name);
-	free(cps->ci.id);
-	free(value);
-	return TRUE;
+    photo_ht = cps->photo_ht;
+
+	g_hash_table_foreach_remove(photo_ht, free_photo_ht, NULL);
+    
+    if( g_hash_table_size(photo_ht) == 0 ) {
+        g_hash_table_destroy(photo_ht);
+
+        free(key);
+        free(cps->ci.name);
+        free(cps->ci.id);
+        free(value);
+        return TRUE;
+    }
+    else {
+        return FALSE;
+    }
 }
 
 /*
@@ -206,24 +223,28 @@ static int check_cache() {
 	if((time(NULL) - last_cleaned) < DEFAULT_CACHE_TIMEOUT)
 		return SUCCESS;
 
-	/* Wipe entire cache */
+	/* Wipe clean entries from the cache. */
 	g_hash_table_foreach_remove(photoset_ht, free_photoset_ht, NULL);
 
-	/* Create an empty photoset container for the photos not in a photoset */
-	if(new_cached_photoset(&cps, "", ""))
-		return FAIL;
+    if( !g_hash_table_lookup( photoset_ht, "" ) ) {
+        /* Create an empty photoset container for the photos not in a photoset */
+        if(new_cached_photoset(&cps, "", ""))
+            return FAIL;
 
-	cached_nophotoset = cps;
-	g_hash_table_insert(photoset_ht, strdup(""), cps);
+        cached_nophotoset = cps;
+        g_hash_table_insert(photoset_ht, strdup(""), cps);
+    }
 
 	if(!(fps = flickcurl_photosets_getList(fc, NULL)))
 		return FAIL;
 
 	/* Add the photosets to the cache */
 	for(i = 0; fps[i]; i++) {
-		if(new_cached_photoset(&cps, fps[i]->title, fps[i]->id))
-			return FAIL;
-		g_hash_table_insert(photoset_ht, strdup(cps->ci.name), cps);
+        if( !g_hash_table_lookup( photoset_ht, fps[i]->title ) ) {
+            if(new_cached_photoset(&cps, fps[i]->title, fps[i]->id))
+                return FAIL;
+            g_hash_table_insert(photoset_ht, strdup(cps->ci.name), cps);
+        }
 	}
 	flickcurl_free_photosets(fps);
 
@@ -263,20 +284,41 @@ static int check_photoset_cache(cached_photoset *cps) {
 	for(j = 0; fp[j]; j++) {
 		cached_photo *cp;
 		struct tm tm;
+        char *title;
+        char *id;
+
+        title = fp[j]->fields[PHOTO_FIELD_title].string;
+        id    = fp[j]->id;
+
+        if( title == '\0' ) {
+            if( (cp = g_hash_table_lookup( cps->photo_ht, id ) ) ) {
+                if( !strcmp( cp->ci.id, id ) ) {
+                    continue;
+                }
+            }
+        }
+        else {
+            if( (cp = g_hash_table_lookup( cps->photo_ht, title )) ) {
+                if( !strcmp( cp->ci.id, id ) ) {
+                    continue;
+                }
+            }
+        }
+
 		memset(&tm, 0, sizeof(struct tm));
 
 		if(!(cp = (cached_photo *)malloc(sizeof(cached_photo))))
 			return FAIL;
 		cp->uri = flickcurl_photo_as_source_uri(fp[j], GET_PHOTO_SIZE);
-		cp->ci.name = strdup(fp[j]->fields[PHOTO_FIELD_title].string);
-		cp->ci.id = strdup(fp[j]->id);
-		cp->ci.size = 1024;	/* Trick so that file managers do not think file is empty... */
+		cp->ci.name = strdup(title);
+		cp->ci.id = strdup(id);
+		cp->ci.size = 1024;	                /* Trick so that file managers do not think file is empty... */
         cp->ci.dirty = CLEAN;
 
 		sscanf(fp[j]->fields[PHOTO_FIELD_dates_taken].string, "%d-%d-%d %d:%d:%d",
 		  &(tm.tm_year), &(tm.tm_mon), &(tm.tm_mday), &(tm.tm_hour), &(tm.tm_min), &(tm.tm_sec));
 		tm.tm_year = tm.tm_year - 1900;		/* Years since 1990 */
-		tm.tm_mon--;				/* Programmers start with 0... */
+		tm.tm_mon--;				        /* Programmers start with 0... */
 		tm.tm_sec--;
 		tm.tm_min--;
 		tm.tm_hour--;
