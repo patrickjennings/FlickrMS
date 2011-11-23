@@ -139,6 +139,7 @@ static int new_cached_photoset(cached_photoset **cps, char *name, char *id) {
 	ci->id = strdup(id);
 	ci->time = 0;
 	ci->size = 0;
+    ci->dirty = CLEAN;
 	(*cps)->set = CACHE_UNSET;
 	(*cps)->photo_ht = g_hash_table_new(g_str_hash, g_str_equal);
 
@@ -270,6 +271,7 @@ static int check_photoset_cache(cached_photoset *cps) {
 		cp->ci.name = strdup(fp[j]->fields[PHOTO_FIELD_title].string);
 		cp->ci.id = strdup(fp[j]->id);
 		cp->ci.size = 1024;	/* Trick so that file managers do not think file is empty... */
+        cp->ci.dirty = CLEAN;
 
 		sscanf(fp[j]->fields[PHOTO_FIELD_dates_taken].string, "%d-%d-%d %d:%d:%d",
 		  &(tm.tm_year), &(tm.tm_mon), &(tm.tm_mday), &(tm.tm_hour), &(tm.tm_min), &(tm.tm_sec));

@@ -8,6 +8,7 @@ typedef struct {
 	char *id;
 	time_t time;
 	unsigned int size;
+    unsigned short dirty;
 } cached_information;
 
 

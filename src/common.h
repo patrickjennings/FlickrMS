@@ -6,4 +6,7 @@
 
 #define DEBUG   1
 
+#define CLEAN   0
+#define DIRTY   1
+
 #endif
