@@ -125,7 +125,9 @@ static int fms_getattr(const char *path, struct stat *stbuf) {
     int retval = -ENOENT;
     memset((void *)stbuf, 0, sizeof(struct stat));
 
+    #ifdef DEBUG
     printf( "fms_getattr: %s\n", path );
+    #endif
 
     if(!strcmp(path, "/")) { /* Path is mount directory */
         set_stbuf(stbuf, S_IFDIR | PERMISSIONS, uid, gid, 0, 0, 1); /* FIXME: Total size of all files... or leave at 0? */
@@ -175,7 +177,9 @@ static int fms_readdir(const char *path, void *buf,
     (void)offset;
     (void)fi;
 
+    #ifdef DEBUG
     printf( "fms_readdir: %s\n", path );
+    #endif
 
     if(!strcmp(path, "/")) {                            /* Path is to mounted directory */
         num_names = get_photo_names(emptystr, &names);  /* Get all photo names with no photoset attached */
@@ -209,7 +213,9 @@ static int fms_rename(const char *oldpath, const char *newpath) {
     int old_index = slash_index(old_path);
     int new_index = slash_index(new_path);
 
+    #ifdef DEBUG
     printf( "fms_rename: %s to %s\n", oldpath, newpath );
+    #endif
 
     if(old_index < 1 && new_index < 1)
         set_photo_name(emptystr, old_path, new_path);
@@ -244,7 +250,9 @@ static int fms_open(const char *path, struct fuse_file_info *fi) {
     int fd;
     struct stat st_buf;
 
+    #ifdef DEBUG
     printf( "fms_open: %s\n", path );
+    #endif
 
     if(split_path(path, &photoset, &photo))
         return FAIL;
@@ -287,20 +295,26 @@ static int fms_open(const char *path, struct fuse_file_info *fi) {
 static int fms_read(const char *path, char *buf, size_t size,
   off_t offset, struct fuse_file_info *fi) {
     (void)path;
+    #ifdef DEBUG
     printf( "fms_read: %s", path );
+    #endif
     return pread(fi->fh, buf, size, offset);
 }
 
 static int fms_write(const char *path, const char *buf, size_t size,
   off_t offset, struct fuse_file_info *fi) {
     (void)path;
+    #ifdef DEBUG
     printf( "fms_write: %s", path );
+    #endif
     return pwrite(fi->fh, buf, size, offset);
 }
 
 static int fms_flush(const char *path, struct fuse_file_info *fi) {
     (void)path;
+    #ifdef DEBUG
     printf( "fms_flush: %s", path );
+    #endif
     return close(fi->fh);
 }
 
@@ -309,7 +323,9 @@ static int fms_release(const char *path, struct fuse_file_info *fi) {
     char *photoset, *photo;
     char *tmp_scrath_path;  
 
+    #ifdef DEBUG
     printf( "fms_release: %s", path );
+    #endif
 
     if(split_path(path, &photoset, &photo))
         return FAIL;
@@ -332,7 +348,9 @@ static int fms_create(const char *path, mode_t mode, struct fuse_file_info *fi) 
     int fd;
     char *tmp_scrath_path;
 
+    #ifdef DEBUG
     printf( "fms_create: %s\n", path );
+    #endif
 
     tmp_scrath_path = (char *)malloc(strlen(tmp_path) + strlen(path) + 1);
     strcpy(tmp_scrath_path, tmp_path);
@@ -348,13 +366,17 @@ static int fms_create(const char *path, mode_t mode, struct fuse_file_info *fi) 
 /* Only called after create. For new files. */
 static int fms_fgetattr(const char *path, struct stat *stbuf, struct fuse_file_info *fi) {
     (void)path;
+    #ifdef DEBUG
     printf( "fms_fgetattr: %s\n", path );
+    #endif
     return fstat(fi->fh, stbuf);
 }
 
 static int fms_mkdir(const char *path, mode_t mode) {
     (void)mode, (void)path;
+    #ifdef DEBUG
     printf( "fms_mkdir: %s\n", path );
+    #endif
     return FAIL;
 }
 
