@@ -296,7 +296,7 @@ static int fms_read(const char *path, char *buf, size_t size,
   off_t offset, struct fuse_file_info *fi) {
     (void)path;
     #ifdef DEBUG
-    printf( "fms_read: %s", path );
+    printf( "fms_read: %s\n", path );
     #endif
     return pread(fi->fh, buf, size, offset);
 }
@@ -304,16 +304,26 @@ static int fms_read(const char *path, char *buf, size_t size,
 static int fms_write(const char *path, const char *buf, size_t size,
   off_t offset, struct fuse_file_info *fi) {
     (void)path;
+    char *photoset, *photo;
+
     #ifdef DEBUG
-    printf( "fms_write: %s", path );
+    printf( "fms_write: %s\n", path );
     #endif
+
+    if(split_path(path, &photoset, &photo))
+        return FAIL;
+
+    set_photo_dirty( photoset, photo, DIRTY );
+
+    free(photoset);
+    free(photo);
     return pwrite(fi->fh, buf, size, offset);
 }
 
 static int fms_flush(const char *path, struct fuse_file_info *fi) {
     (void)path;
     #ifdef DEBUG
-    printf( "fms_flush: %s", path );
+    printf( "fms_flush: %s\n", path );
     #endif
     return close(fi->fh);
 }
@@ -324,7 +334,7 @@ static int fms_release(const char *path, struct fuse_file_info *fi) {
     char *tmp_scrath_path;  
 
     #ifdef DEBUG
-    printf( "fms_release: %s", path );
+    printf( "fms_release: %s\n", path );
     #endif
 
     if(split_path(path, &photoset, &photo))

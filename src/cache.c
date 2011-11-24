@@ -290,18 +290,18 @@ static int check_photoset_cache(cached_photoset *cps) {
         title = fp[j]->fields[PHOTO_FIELD_title].string;
         id    = fp[j]->id;
 
-        if( title == '\0' ) {
-            if( (cp = g_hash_table_lookup( cps->photo_ht, id ) ) ) {
-                if( !strcmp( cp->ci.id, id ) ) {
-                    continue;
-                }
+        /* Check if dirty version already exists in the database. */
+        if( (cp = g_hash_table_lookup( cps->photo_ht, title )) ) {
+            if( !strcmp( cp->ci.id, id ) ) {
+                continue;
             }
         }
-        else {
-            if( (cp = g_hash_table_lookup( cps->photo_ht, title )) ) {
-                if( !strcmp( cp->ci.id, id ) ) {
-                    continue;
-                }
+        else if( (cp = g_hash_table_lookup( cps->photo_ht, id ) ) ) {
+            if( !strcmp( cp->ci.id, id ) ) {
+                continue;
+            }
+            else {  /* TODO: Need to figure out what to do here. */
+                continue;
             }
         }
 
@@ -545,16 +545,76 @@ int set_photo_name(const char *photoset, const char *photo, const char *newname)
 	return ret;
 }
 
-/*int set_photo_photoset(const char *oldset, const char *newset, const char *photo) {
+/*int set_photos_photoset(const char *oldset, const char *newset, const char *photo) {
 	
 }*/
 
 /* Sets the photos size */
 int set_photo_size(const char *photoset, const char *photo, unsigned int newsize) {
 	cached_photo *cp;
-	if(!(cp = get_photo(photoset, photo)))
+
+	pthread_mutex_lock(&cache_lock);
+	if(!(cp = get_photo(photoset, photo))) {
+        pthread_mutex_unlock(&cache_lock);
 		return FAIL;
+    }
 	cp->ci.size = newsize;
+	pthread_mutex_unlock(&cache_lock);
+
 	return SUCCESS;
+}
+
+int set_photo_dirty( const char *photoset, const char *photo, unsigned short dirty ) {
+    cached_photo *cp;
+
+	pthread_mutex_lock(&cache_lock);
+    if(!(cp = get_photo(photoset, photo))) {
+        pthread_mutex_unlock(&cache_lock);
+        return FAIL;
+    }
+    cp->ci.dirty = dirty;
+	pthread_mutex_unlock(&cache_lock);
+
+    return SUCCESS;
+}
+
+int get_photo_dirty( const char *photoset, const char *photo ) {
+    cached_photo *cp;
+    unsigned short dirty;
+
+	pthread_mutex_lock(&cache_lock);
+    if(!(cp = get_photo(photoset, photo))) {
+        pthread_mutex_unlock(&cache_lock);
+        return FAIL;
+    }
+    dirty = cp->ci.dirty;
+	pthread_mutex_unlock(&cache_lock);
+
+    return dirty;
+}
+
+int create_empty_photo( const char *photoset, const char *photo ) {
+    cached_photo *cp;
+
+    if( photo_lookup( photoset, photo ) )
+        return FAIL;
+
+	pthread_mutex_lock(&cache_lock);
+
+    if(!(cp = (cached_photo *)malloc(sizeof(cached_photo))))
+        goto fail;
+
+	memset(cp, 0, sizeof(cached_information));
+
+    cp->ci.name = strdup(photo);
+    cp->ci.size = 0;
+    cp->ci.dirty = DIRTY;
+    cp->ci.time = 0;        /* TODO: Change this to current time */
+
+	pthread_mutex_unlock(&cache_lock);
+    return SUCCESS;
+
+fail: pthread_mutex_unlock(&cache_lock);
+    return FAIL;
 }
 
