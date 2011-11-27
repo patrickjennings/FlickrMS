@@ -594,27 +594,37 @@ int get_photo_dirty( const char *photoset, const char *photo ) {
 }
 
 int create_empty_photo( const char *photoset, const char *photo ) {
+    cached_photoset *cps;
     cached_photo *cp;
-
-    if( photo_lookup( photoset, photo ) )
-        return FAIL;
+    int retval = FAIL;
 
 	pthread_mutex_lock(&cache_lock);
 
-    if(!(cp = (cached_photo *)malloc(sizeof(cached_photo))))
+	cps = g_hash_table_lookup(photoset_ht, photoset);
+
+    /* Check to see photoset exists. */
+    if( !cps )
+        goto fail;
+
+   /* Check if photo already exists */
+    if( g_hash_table_lookup( cps->photo_ht, photo  ) )
+        goto fail;
+
+    /* The new empty photo */
+    if(!(cp = (cached_photo *)malloc(sizeof(cached_photo)))) 
         goto fail;
 
 	memset(cp, 0, sizeof(cached_information));
 
     cp->ci.name = strdup(photo);
-    cp->ci.size = 0;
     cp->ci.dirty = DIRTY;
-    cp->ci.time = 0;        /* TODO: Change this to current time */
+	cp->ci.time = time(NULL);
 
-	pthread_mutex_unlock(&cache_lock);
-    return SUCCESS;
+    g_hash_table_insert(cps->photo_ht, strdup(cp->ci.name), cp);
+
+    retval = SUCCESS;
 
 fail: pthread_mutex_unlock(&cache_lock);
-    return FAIL;
+    return retval;
 }
 

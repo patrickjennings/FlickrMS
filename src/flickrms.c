@@ -356,11 +356,23 @@ static int fms_release(const char *path, struct fuse_file_info *fi) {
 
 static int fms_create(const char *path, mode_t mode, struct fuse_file_info *fi) {
     int fd;
+    char *photoset, *photo;
     char *tmp_scrath_path;
 
     #ifdef DEBUG
     printf( "fms_create: %s\n", path );
     #endif
+
+    if(split_path(path, &photoset, &photo))
+        return FAIL;
+
+    int retval = create_empty_photo( photoset, photo );
+    
+    free(photoset);
+    free(photo);
+
+    if( retval )
+        return FAIL;
 
     tmp_scrath_path = (char *)malloc(strlen(tmp_path) + strlen(path) + 1);
     strcpy(tmp_scrath_path, tmp_path);
