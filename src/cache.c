@@ -184,6 +184,7 @@ static gboolean free_photoset_ht(gpointer key, gpointer value, gpointer user_dat
         return TRUE;
     }
     else {
+        cps->set = CACHE_UNSET;
         return FALSE;
     }
 }
@@ -242,19 +243,23 @@ static int check_photoset_cache(cached_photoset *cps) {
 
 	if(!cps)
 		return FAIL;
-	if(!(cps->photo_ht))
+	if(!(cps->photo_ht)) {
 		return FAIL;
-	if(cps->set)
+    }
+	if(cps->set) {
 		return SUCCESS;
+    }
 
 	/* Are we searching for photos in a photoset or not? */
 	if(cps == cached_nophotoset) {		/* Get photos NOT in a photoset */
-		if(!(fp = flickcurl_photos_getNotInSet(fc, 0, 0, NULL, NULL, 0, "date_taken", -1, -1)))
+		if(!(fp = flickcurl_photos_getNotInSet(fc, 0, 0, NULL, NULL, 0, "date_taken", -1, -1))) {
 			return FAIL;
+        }
 	}
 	else {					/* Add the photos of the photoset into the cache */
-		if(!(fp = flickcurl_photosets_getPhotos(fc, cps->ci.id, "date_taken", 0, -1, -1)))
+		if(!(fp = flickcurl_photosets_getPhotos(fc, cps->ci.id, "date_taken", 0, -1, -1))) {
 			return FAIL;
+        }
 	}
 
 	/* Add photos to photoset cache */
@@ -424,7 +429,7 @@ int get_photo_names(const char *photoset, char ***names) {
 	g_hash_table_iter_init(&iter, cps->photo_ht);
 	for(i = 0; g_hash_table_iter_next(&iter, (gpointer)&key, (gpointer)&cp); i++)
     {
-        printf( "Name: %s, id: %s dirty: %d, key: %s\n", cp->ci.name, cp->ci.id, cp->ci.dirty, key );
+        printf( "Name: %s, id: %s dirty: %d, key: %s, size: %d\n", cp->ci.name, cp->ci.id, cp->ci.dirty, key, cp->ci.size );
         (*names)[i] = strdup(key);
     }
     printf( "\n\n\n" );
