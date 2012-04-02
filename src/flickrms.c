@@ -257,28 +257,48 @@ static int fms_open(const char *path, struct fuse_file_info *fi) {
     if(split_path(path, &photoset, &photo))
         return FAIL;
 
-    uri = get_photo_uri(photoset, photo);
-    if(!uri)
-        return FAIL;
-
     wget_path = (char *)malloc(strlen(tmp_path) + strlen(path) + 1);
     set_photoset_tmp_dir(wget_path, tmp_path, photoset);
-    mkdir(wget_path, PERMISSIONS);      /* Create photoset temp directory if it doesn't exist */
 
-    strcpy(wget_path, tmp_path);
-    strcat(wget_path, path);
+    #ifdef DEBUG
+    printf( "tmp_path: %s, photoset: %s, photo: %s\n", tmp_path, photoset, photo );
+    #endif
 
-    if(access(wget_path, F_OK)) {
-        if(wget(uri, wget_path) < 0)    /* Get the image from flickr and put it into the temp dir if it doesn't already exist. */
-            return FAIL;
+    uri = get_photo_uri(photoset, photo);
+    if( uri ) {
+        mkdir(wget_path, PERMISSIONS);      /* Create photoset temp directory if it doesn't exist */
+
+        strcpy(wget_path, tmp_path);
+        strcat(wget_path, path);
+
+        if(access(wget_path, F_OK)) {
+            if(wget(uri, wget_path) < 0)  {   /* Get the image from flickr and put it into the temp dir if it doesn't already exist. */
+                free( wget_path );
+                return FAIL;
+            }
+        }
+    }
+    else
+    {
+        /* Photo dirty? Try to open anyway. */
+        strcpy(wget_path, tmp_path);
+        strcat(wget_path, path);
     }
 
-    if(stat(wget_path, &st_buf))
+    #ifdef DEBUG
+    printf( "opening %s\n", wget_path );
+    #endif
+
+    if(stat(wget_path, &st_buf)) {
+        free( wget_path );
         return FAIL;
+    }
 
     if((time(NULL) - st_buf.st_mtime) >= 1200) {
-        if(wget(uri, wget_path) < 0)
+        if(wget(uri, wget_path) < 0) {
+            free( wget_path );
             return FAIL;
+        }
     }
 
     fd = open(wget_path, fi->flags);
@@ -331,7 +351,7 @@ static int fms_flush(const char *path, struct fuse_file_info *fi) {
 static int fms_release(const char *path, struct fuse_file_info *fi) {
     (void)fi;
     char *photoset, *photo;
-    char *tmp_scrath_path;  
+    char *temp_scratch_path;  
 
     #ifdef DEBUG
     printf( "fms_release: %s\n", path );
@@ -340,15 +360,22 @@ static int fms_release(const char *path, struct fuse_file_info *fi) {
     if(split_path(path, &photoset, &photo))
         return FAIL;
 
-    tmp_scrath_path = (char *)malloc(strlen(tmp_path) + strlen(path) + 1);
-    strcpy(tmp_scrath_path, tmp_path);
-    strcat(tmp_scrath_path, path);
-    // TODO: Upload file here...
+    temp_scratch_path = (char *)malloc(strlen(tmp_path) + strlen(path) + 1);
+    strcpy(temp_scratch_path, tmp_path);
+    strcat(temp_scratch_path, path);
 
-    set_photoset_tmp_dir(tmp_scrath_path, tmp_path, photoset);
-    rmdir(tmp_scrath_path);
+    set_photoset_tmp_dir(temp_scratch_path, tmp_path, photoset);
 
-    free(tmp_scrath_path);
+    if( get_photo_dirty( photoset, photo ) == DIRTY ) {
+        #ifdef DEBUG
+        printf( "\t%s is dirty\n", path );
+        #endif
+        //upload_photo( photoset, photo, temp_scratch_path );
+    }
+
+    rmdir(temp_scratch_path);
+
+    free(temp_scratch_path);
     free(photoset);
     free(photo);
     return SUCCESS;
@@ -357,7 +384,7 @@ static int fms_release(const char *path, struct fuse_file_info *fi) {
 static int fms_create(const char *path, mode_t mode, struct fuse_file_info *fi) {
     int fd;
     char *photoset, *photo;
-    char *tmp_scrath_path;
+    char *temp_scratch_path;
 
     #ifdef DEBUG
     printf( "fms_create: %s\n", path );
@@ -374,14 +401,14 @@ static int fms_create(const char *path, mode_t mode, struct fuse_file_info *fi) 
     if( retval )
         return FAIL;
 
-    tmp_scrath_path = (char *)malloc(strlen(tmp_path) + strlen(path) + 1);
-    strcpy(tmp_scrath_path, tmp_path);
-    strcat(tmp_scrath_path, path);
+    temp_scratch_path = (char *)malloc(strlen(tmp_path) + strlen(path) + 1);
+    strcpy(temp_scratch_path, tmp_path);
+    strcat(temp_scratch_path, path);
 
-    fd = creat(tmp_scrath_path, mode);
+    fd = creat(temp_scratch_path, mode);
     fi->fh = fd;
 
-    free(tmp_scrath_path);
+    free(temp_scratch_path);
     return (fd < 0)?FAIL:SUCCESS;
 }
 

@@ -27,5 +27,6 @@ int set_photo_size(const char *photoset, const char *photo, unsigned int newsize
 int set_photo_dirty( const char *photoset, const char *photo, unsigned short dirty );
 int get_photo_dirty( const char *photoset, const char *photo );
 int create_empty_photo( const char *pphotoset, const char *photo );
+int upload_photo( const char *photoset, const char *photo, const char *path );
 
 #endif

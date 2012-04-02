@@ -46,31 +46,6 @@ static time_t last_cleaned;			        /* To age/invalidate the cache */
 static flickcurl *fc;
 
 
-/**
- * ===Flickr API Methods===
-**/
-
-int photoDelete(char *photo_id) {
-	return flickcurl_photos_delete(fc, photo_id);
-}
-
-void photoUpload(char *path, char *descript, char *title, char *tags) {
-	flickcurl_upload_status* status;
-	flickcurl_upload_params params;
-
-	memset(&params, '\0', sizeof(flickcurl_upload_params));
-	params.safety_level = 1;	/* default safety */
-	params.content_type = 1;	/* default photo */
-	params.photo_file = path;
-	params.description = descript;
-	params.title = title;
-	params.tags = tags;
-
-	status = flickcurl_photos_upload_params(fc, &params);
-	if(status)
-		flickcurl_free_upload_status(status);
-}
-
 /*
  * Reads the users configuration file
  * located in ~/.flickcurl.conf
@@ -156,8 +131,10 @@ static cached_information *copy_cached_info(const cached_information *ci) {
 	if(!newci)
 		return 0;
 	*newci = *ci;
-	newci->name = strdup(ci->name);
-	newci->id = strdup(ci->id);
+    if( ci->name )
+        newci->name = strdup(ci->name);
+    if( ci->id )
+        newci->id = strdup(ci->id);
 	return newci;
 }
 
@@ -174,7 +151,7 @@ static gboolean free_photo_ht(gpointer key, gpointer value, gpointer user_data) 
 	(void)user_data;
 	cached_photo *cp = value;
 
-    if( cp->ci.dirty ) {
+    if( cp->ci.dirty == CLEAN ) {
         free(cp->uri);
         free(cp->ci.name);
         free(cp->ci.id);
@@ -420,6 +397,7 @@ int get_photo_names(const char *photoset, char ***names) {
 	GHashTableIter iter;
 	char *key;
 	cached_photoset *cps;
+    cached_photo *cp;
 	int i, size;
 
 	if(!names || !photoset)
@@ -441,10 +419,15 @@ int get_photo_names(const char *photoset, char ***names) {
 	if(!(*names = (char **)malloc(sizeof(char *) * size)))
 		goto fail;
 
+    printf( "\n\n\n" );
 	/* Add each photo to the list. We add the keys since the names may be duplicates/NULL */
 	g_hash_table_iter_init(&iter, cps->photo_ht);
-	for(i = 0; g_hash_table_iter_next(&iter, (gpointer)&key, NULL); i++)
-			(*names)[i] = strdup(key);
+	for(i = 0; g_hash_table_iter_next(&iter, (gpointer)&key, (gpointer)&cp); i++)
+    {
+        printf( "Name: %s, id: %s dirty: %d, key: %s\n", cp->ci.name, cp->ci.id, cp->ci.dirty, key );
+        (*names)[i] = strdup(key);
+    }
+    printf( "\n\n\n" );
 
 	pthread_mutex_unlock(&cache_lock);
 	return size;
@@ -519,8 +502,11 @@ char *get_photo_uri(const char *photoset, const char *photo) {
 	char *uri_copy = 0;	
 
 	pthread_mutex_lock(&cache_lock);
-	if((cp = get_photo(photoset, photo)))
-		uri_copy = strdup(cp->uri);	
+	if((cp = get_photo(photoset, photo))) {
+        if( cp->uri ) {
+            uri_copy = strdup(cp->uri);	
+        }
+    }
 	pthread_mutex_unlock(&cache_lock);
 
 	return uri_copy;
@@ -614,11 +600,13 @@ int create_empty_photo( const char *photoset, const char *photo ) {
     if(!(cp = (cached_photo *)malloc(sizeof(cached_photo)))) 
         goto fail;
 
-	memset(cp, 0, sizeof(cached_information));
+	memset(cp, 0, sizeof(cached_photo));
 
     cp->ci.name = strdup(photo);
+    cp->ci.id = strdup("");
     cp->ci.dirty = DIRTY;
 	cp->ci.time = time(NULL);
+    cp->ci.size = 1024;
 
     g_hash_table_insert(cps->photo_ht, strdup(cp->ci.name), cp);
 
@@ -626,5 +614,46 @@ int create_empty_photo( const char *photoset, const char *photo ) {
 
 fail: pthread_mutex_unlock(&cache_lock);
     return retval;
+}
+
+int upload_photo( const char *photoset, const char *photo, const char *path ) {
+	flickcurl_upload_status* status;
+	flickcurl_upload_params params;
+    cached_photoset *cps;
+    cached_photo *cp;
+    int retval = FAIL;
+
+	pthread_mutex_lock(&cache_lock);
+
+	cps = g_hash_table_lookup(photoset_ht, photoset);
+
+    if( !cps )
+        goto fail;
+
+    if( !( cp = g_hash_table_lookup( cps->photo_ht, photo  ) ) )
+        goto fail;
+
+	memset(&params, '\0', sizeof(flickcurl_upload_params));
+	params.safety_level = 1;	/* default safety */
+	params.content_type = 1;	/* default photo */
+    params.photo_file = path;
+    params.description = "Uploaded using FlickrMS";
+	params.title = cp->ci.name;
+/*	params.tags = tags; */
+
+	status = flickcurl_photos_upload_params(fc, &params);
+	if(status)
+		flickcurl_free_upload_status(status);
+
+    cp->ci.dirty = CLEAN;
+
+    cps->set = CACHE_UNSET;
+
+fail:   pthread_mutex_unlock(&cache_lock);
+    return retval;
+}
+
+int photoDelete(char *photo_id) {
+	return flickcurl_photos_delete(fc, photo_id);
 }
 
