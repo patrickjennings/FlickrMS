@@ -78,8 +78,12 @@ static int flickr_init() {
 		return FAIL;
 
 	/* Read from the config file, ~/.flickcurl.conf */
-	if(read_ini_config(conf_path, "flickr", fc, read_conf))
+	/*if(read_ini_config(conf_path, "flickr", fc, read_conf))
 		return FAIL;
+    */
+	if(flickcurl_config_read_ini(fc, conf_path, "flickr", fc, read_conf))
+		return FAIL;
+    
 
 	login = flickcurl_test_login(fc);
 	if(!login)
@@ -647,12 +651,15 @@ int upload_photo( const char *photoset, const char *photo, const char *path ) {
 /*	params.tags = tags; */
 
 	status = flickcurl_photos_upload_params(fc, &params);
+
 	if(status)
 		flickcurl_free_upload_status(status);
 
     cp->ci.dirty = CLEAN;
 
     cps->set = CACHE_UNSET;
+
+    retval = SUCCESS;
 
 fail:   pthread_mutex_unlock(&cache_lock);
     return retval;

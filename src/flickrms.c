@@ -294,6 +294,10 @@ static int fms_open(const char *path, struct fuse_file_info *fi) {
         return FAIL;
     }
 
+    #ifdef DEBUG
+    printf( "Time: %ld\n", ( time(NULL) - st_buf.st_mtime ) );
+    #endif
+
     if((time(NULL) - st_buf.st_mtime) >= 1200) {
         if(wget(uri, wget_path) < 0) {
             free( wget_path );
@@ -364,14 +368,14 @@ static int fms_release(const char *path, struct fuse_file_info *fi) {
     strcpy(temp_scratch_path, tmp_path);
     strcat(temp_scratch_path, path);
 
-    set_photoset_tmp_dir(temp_scratch_path, tmp_path, photoset);
-
     if( get_photo_dirty( photoset, photo ) == DIRTY ) {
         #ifdef DEBUG
         printf( "\t%s is dirty\n", path );
         #endif
-        //upload_photo( photoset, photo, temp_scratch_path );
+        upload_photo( photoset, photo, temp_scratch_path );
     }
+
+    set_photoset_tmp_dir(temp_scratch_path, tmp_path, photoset);
 
     rmdir(temp_scratch_path);
 
