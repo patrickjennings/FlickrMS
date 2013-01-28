@@ -18,7 +18,7 @@ PROJ:=flickrms
 all: $(PROJ)
 
 $(PROJ): $(OBJS)
-	$(CC) -o $@ $(CFLAGS) $(INCLUDES) $^
+	$(CC) -o $@ $^ $(CFLAGS) $(INCLUDES)
 
 flickrms.o: flickrms.c cache.c wget.c
 	$(CC) $(CFLAGS) $(FUSEINC) -c $<
