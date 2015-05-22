@@ -47,20 +47,6 @@ static flickcurl *fc;
 
 
 /*
- * Reads the users configuration file
- * located in ~/.flickcurl.conf
-*/
-static void read_conf(void* userdata, const char* key, const char* value) {
-	flickcurl *fc = (flickcurl *)userdata;
-	if(!strcmp(key, "api_key"))
-		flickcurl_set_api_key(fc, value);
-	else if(!strcmp(key, "secret"))
-		flickcurl_set_shared_secret(fc, value);
-	else if(!strcmp(key, "auth_token"))
-		flickcurl_set_auth_token(fc, value);
-}
-
-/*
  * Initialize the flickcurl connection
 */
 static int flickr_init() {
@@ -78,10 +64,7 @@ static int flickr_init() {
 		return FAIL;
 
 	/* Read from the config file, ~/.flickcurl.conf */
-	/*if(read_ini_config(conf_path, "flickr", fc, read_conf))
-		return FAIL;
-    */
-	if(flickcurl_config_read_ini(fc, conf_path, "flickr", fc, read_conf))
+	if(flickcurl_config_read_ini(fc, conf_path, "flickr", fc, flickcurl_config_var_handler))
 		return FAIL;
     
 
