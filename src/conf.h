@@ -4,7 +4,7 @@
 #include "common.h"
 
 char *get_conf_path();
-int create_conf(char *conf_path);
-int check_conf_file();
+int create_conf(char *conf_path, flickcurl *fc);
+int check_conf_file(char *conf_path, flickcurl *fc);
 
 #endif

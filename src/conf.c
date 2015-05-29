@@ -2,20 +2,20 @@
 #include <string.h>
 #include <unistd.h>
 #include <stdio.h>
+#include <flickcurl.h>
 
 #include "conf.h"
 
 
 #define KEY	"2e66493ec959256a79e4e5a3da7df729"
 #define SECRET	"c1b99d47790391c3"
-#define	URL	"http://www.flickr.com/services/auth/?mobile=1&api_key=2e66493ec959256a79e4e5a3da7df729&perms=delete&api_sig=6417abca6880d676c010600e8c65a045"
 
 
 static char conf_file_name[] = ".flickcurl.conf";
 
 
 char *get_conf_path() {
-        char *conf_path;
+    char *conf_path;
 	char *home;
 
 	home = getenv("HOME");
@@ -31,44 +31,38 @@ char *get_conf_path() {
 	return conf_path;
 }
 
-int create_conf(char *conf_path) {
-	#define FROB_SIZE 12
-	char FROB[FROB_SIZE];
-	char command[25] = "flickcurl -a ";
-	FILE *fp;
+int create_conf(char *conf_path, flickcurl *fc) {
+	#define VERIFIER_SIZE 12
+	char verifier[VERIFIER_SIZE];
 
-	if(!conf_path)
-		return FAIL;
-	fp = fopen(conf_path, "w");
-	if(!fp)
-		return FAIL;
+    flickcurl_set_oauth_client_key(fc, KEY);
+    flickcurl_set_oauth_client_secret(fc, SECRET);
 
-	fputs("[flickr]\napi_key=" KEY "\nsecret=" SECRET "\n", fp);
-	fclose(fp);
+    if(flickcurl_oauth_create_request_token(fc, NULL))
+        return FAIL;
 
-	fputs("Go to " URL "\nPaste the application code here:\n", stdout);
+    const char *uri = flickcurl_oauth_get_authorize_uri(fc);
 
-	if(!fgets(FROB, FROB_SIZE, stdin))
+    printf( "Go to: %s\n", uri );
+    printf( "Enter the 9-digit Verifier: " );
+
+	if(!fgets(verifier, VERIFIER_SIZE, stdin))
 		return FAIL;
 
-	strcat(command, FROB);
-	printf("%s\n", command);
-	system(command);
+    if(flickcurl_oauth_create_access_token(fc, verifier))
+        return FAIL;
+
+    if(flickcurl_config_write_ini(fc, conf_path, "flickr"))
+        return FAIL;
 
 	return SUCCESS;
 }
 
-int check_conf_file() {
-	char *conf_path;
-
-	conf_path = get_conf_path();
-	if(!conf_path)
-		return FAIL;
-	if(access(conf_path, F_OK) < 0)	/* If conf file doesn't exist, create and ask for new frob */
-		if(create_conf(conf_path))
+int check_conf_file(char *conf_path, flickcurl *fc) {
+	if(access(conf_path, F_OK) < 0)	/* If conf file doesn't exist, create */
+		if(create_conf(conf_path, fc))
 			return FAIL;
 
-	free(conf_path);
 	return SUCCESS;
 }
 

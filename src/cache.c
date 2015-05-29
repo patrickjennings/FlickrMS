@@ -56,11 +56,11 @@ static int flickr_init() {
 	flickcurl_init();
 	fc = flickcurl_new();
 
-	if(check_conf_file())
-		return FAIL;
-
 	conf_path = get_conf_path();
 	if(!conf_path)
+		return FAIL;
+
+	if(check_conf_file(conf_path, fc))
 		return FAIL;
 
 	/* Read from the config file, ~/.flickcurl.conf */

@@ -31,7 +31,7 @@ wget.o: wget.c
 	$(CC) $(CFLAGS) $(CURLINC) -c $<
 
 conf.o: conf.c
-	$(CC) $(CFLAGS) -c $<
+	$(CC) $(CFLAGS) $(FLKCINC) $(LIBXMLIC) -c $<
 
 install:
 	cp flickrms /usr/local/bin/
