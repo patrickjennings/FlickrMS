@@ -27,10 +27,8 @@ organized the way you intended and are perfectly viewable from the file system.
 The application is written in C and was designed for efficiency and compatability.
 It will run on any POSIX compliant machine. This means all UNIX-based and BSD-based
 machines should be supported. The application will use the lowest amount of resources
-possible. Obviously, this application will use your Flickr account to store photos so
-no persistent storage is necessary. The internal caching mechanism dynamically grows
-to allow for infinite storage capacity while still recognizing remote changes to the
-Flickr account.
+possible. The internal caching mechanism dynamically grows to allow for infinite storage
+capacity while still recognizing remote changes to the Flickr account.
 
 FlickrMS was written by an experienced and well-educated hacker. As such, the file system
 will be tested for bugs and UI malfunctions. If you find any pressing concerns, please
@@ -42,7 +40,7 @@ https://github.com/patrickjennings/FlickrMS/issues
 Dependencies:
 	FUSE (tested on fuse-2.8.5)
 		http://fuse.sourceforge.net/
-	>=Flickcurl-1.21
+	>Flickcurl-1.26
 		http://librdf.org/flickcurl/
 
 FlickrMS comes with a custom Makefile that can be used to create the binary
@@ -60,40 +58,14 @@ $ sudo make uninstall
 
 
 ==Configuration==
-You must allow FlickrMS access to your Flickr account. This is done via the Flickr API
-and communication through Flickcurl. You must setup ~/.flickcurl.conf as follows:
-
-$ nano ~/.flickcurl.conf
-[flickr]
-api_key=2e66493ec959256a79e4e5a3da7df729
-secret=c1b99d47790391c3
-$
-
-Then visit:
-http://www.flickr.com/services/auth/?mobile=1&api_key=2e66493ec959256a79e4e5a3da7df729&perms=delete&api_sig=6417abca6880d676c010600e8c65a045
-and select:
-[OK, I'LL AUTHORIZE IT]
-
-This will allow the user the ability to link their Flickr account with FlickrMS.
-The user will be given a 9-digit FROB that can be given to the flickcurl api to
-link the user's account to the interface. Finally, execute:
-
-$ flickcurl -a 123-456-789
-
-where 123-456-789 is the 9-digit FROB given to the user above. This will finish
-the linking of the user's account with the flickcurl API and library and the
-user should then see the following format in their configuration file:
-
-$ cat ~/.flickcurl.conf
-[flickr]
-auth_token=-------
-api_key=2e66493ec959256a79e4e5a3da7df729
-secret=c1b99d47790391c3
-$
+The configuration is the same used by the flickcurl library. On first
+start, a configuration file is created for the user. You must authorize
+the use of your flickr account in order to gain the ability to see and
+edit photos.
 
 See http://librdf.org/flickcurl/ for more information on Flickrcurl API
 configuration and http://www.flickr.com/services/apps/72157623762128193/
-for the info on the api key and secret of FlickrMS.
+for more information on authorization.
 
 
 ==Usage==
@@ -113,11 +85,3 @@ $ fusermount -u mountDir/
 This will remove the file system from the 'mountDir' directory. If you
 navigate into 'mountDir' you will notice that your Flickr photos will
 no longer be visible.
-
-
-==Q/A==
-Q: Why isn't the flickcurl.pc file not able to be found by pkg-config?
-
-A: It is installed in /usr/local/lib/pkgconfig by default. You will have to add
-this directory to the PKG_CONFIG_PATH environment variable using the command:
-export PKG_CONFIG_PATH=/usr/local/lib/pkgconfig/
