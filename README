@@ -13,26 +13,28 @@ Flickr cloud! Paying for Flickr Pro is no longer the only option for satisfying
 your desire for photo perfection... not when there is FlickrMS!
 
 This application can be used to mount a Flickr account directly onto your
-file system. The photos will seem to be on your local machine but all changes done
-will also affect the users Flickr account. Once mounted, the file system will
-act like any other directory and you can use any of your favorite image viewers
-or editors to access your Flickr photos!
+file system. The photos will seem to be on your local machine but all changes
+done will also affect the users Flickr account. Once mounted, the file system
+will act like any other directory and you can use any of your favorite image
+viewers or editors to access your Flickr photos!
 
 Photos will be placed in directories that represent which photoset the photo
 belongs to. If a photo does not belong to a photoset, the photo will appear in
 the root directory. A photo that has an empty name in Flickr, will display its
-Flickr photo id instead. All of this is to ensure that all of your photos will be
-organized the way you intended and are perfectly viewable from the file system.
+Flickr photo id instead. All of this is to ensure that all of your photos will
+be organized the way you intended and are perfectly viewable from the file
+system.
 
-The application is written in C and was designed for efficiency and compatability.
-It will run on any POSIX compliant machine. This means all UNIX-based and BSD-based
-machines should be supported. The application will use the lowest amount of resources
-possible. The internal caching mechanism dynamically grows to allow for infinite storage
-capacity while still recognizing remote changes to the Flickr account.
+The application is written in C and was designed for efficiency and
+compatability.  It will run on any POSIX compliant machine. This means all
+UNIX-based and BSD-based machines should be supported. The application will use
+the lowest amount of resources possible. The internal caching mechanism
+dynamically grows to allow for infinite storage capacity while still recognizing
+remote changes to the Flickr account.
 
-FlickrMS was written by an experienced and well-educated hacker. As such, the file system
-will be tested for bugs and UI malfunctions. If you find any pressing concerns, please
-let them be known at the following URL:
+FlickrMS was written by an experienced and well-educated hacker. As such, the
+file system will be tested for bugs and UI malfunctions. If you find any pressing
+concerns, please let them be known at the following URL:
 https://github.com/patrickjennings/FlickrMS/issues
 
 
