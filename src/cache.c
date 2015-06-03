@@ -541,7 +541,7 @@ int set_photo_size(const char *photoset, const char *photo, unsigned int newsize
 	return SUCCESS;
 }
 
-int set_photo_dirty( const char *photoset, const char *photo, unsigned short dirty ) {
+int set_photo_dirty(const char *photoset, const char *photo, unsigned short dirty) {
     cached_photo *cp;
 
 	pthread_mutex_lock(&cache_lock);
@@ -555,7 +555,7 @@ int set_photo_dirty( const char *photoset, const char *photo, unsigned short dir
     return SUCCESS;
 }
 
-int get_photo_dirty( const char *photoset, const char *photo ) {
+int get_photo_dirty(const char *photoset, const char *photo) {
     cached_photo *cp;
     unsigned short dirty;
 
@@ -570,7 +570,37 @@ int get_photo_dirty( const char *photoset, const char *photo ) {
     return dirty;
 }
 
-int create_empty_photo( const char *photoset, const char *photo ) {
+int create_empty_photoset(const char *photoset) {
+    cached_photoset *cps;
+    int retval = FAIL;
+
+	pthread_mutex_lock(&cache_lock);
+
+    if(g_hash_table_lookup(photoset_ht, photoset))
+        goto fail;
+
+    /* The new empty photoset */
+    if(!(cps = (cached_photoset *)malloc(sizeof(cached_photoset))))
+        goto fail;
+
+	memset(cps, 0, sizeof(cached_photoset));
+
+    cps->ci.name = strdup(photoset);
+    cps->ci.id = strdup("");
+    cps->ci.dirty = DIRTY;
+	cps->ci.time = time(NULL);
+	cps->set = CACHE_SET;
+	cps->photo_ht = g_hash_table_new(g_str_hash, g_str_equal);
+
+    g_hash_table_insert(photoset_ht, strdup(cps->ci.name), cps);
+
+    retval = SUCCESS;
+
+fail: pthread_mutex_unlock(&cache_lock);
+    return retval;
+}
+
+int create_empty_photo(const char *photoset, const char *photo) {
     cached_photoset *cps;
     cached_photo *cp;
     int retval = FAIL;
@@ -607,7 +637,7 @@ fail: pthread_mutex_unlock(&cache_lock);
     return retval;
 }
 
-int upload_photo( const char *photoset, const char *photo, const char *path ) {
+int upload_photo(const char *photoset, const char *photo, const char *path) {
 	flickcurl_upload_status* status;
 	flickcurl_upload_params params;
     cached_photoset *cps;

@@ -426,11 +426,13 @@ static int fms_fgetattr(const char *path, struct stat *stbuf, struct fuse_file_i
 }
 
 static int fms_mkdir(const char *path, mode_t mode) {
-    (void)mode, (void)path;
+    (void)mode;
+
     #ifdef DEBUG
     printf( "fms_mkdir: %s\n", path );
     #endif
-    return FAIL;
+
+    return SUCCESS;
 }
 
 
