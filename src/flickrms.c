@@ -33,14 +33,14 @@ static char emptystr[] = "";
  * Returns the first index of a '/' or negative if non exists in the
  * path supplied.
  */
-static int slash_index(const char *path) {
+static int get_slash_index(const char *path) {
     unsigned int i;
     if(!path)
         return FAIL;
     for(i = 0; i < strlen(path); i++)
         if(path[i] == '/')
             return i;
-    return FAIL;
+    return -1;
 }
 
 /* 
@@ -48,12 +48,12 @@ static int slash_index(const char *path) {
  * "/photosetname/photoname"
  * into: photoset = "photosetname" and photo = "photoname"
  */
-static int split_path(const char *path, char **photoset, char **photo) {
+static int get_photoset_photo_from_path(const char *path, char **photoset, char **photo) {
     int i;
     char *path_dup;
 
     path_dup = strdup(path + 1);
-    i = slash_index(path_dup);
+    i = get_slash_index(path_dup);
 
     if(!path || !photoset || !photo || !path_dup)
         return FAIL;
@@ -76,7 +76,7 @@ static int split_path(const char *path, char **photoset, char **photo) {
  * Sets the uid/gid variables to the user's (who mounted the filesystem)
  * uid/gid. Want to only give the user access to their flickr account.
  */
-static inline int set_user() {
+static inline int set_user_variables() {
     uid = getuid();
     gid = getgid();
     return SUCCESS;
@@ -86,7 +86,7 @@ static inline int set_user() {
  * Set the path to the directory that will be used to get the image
  * data from Flickr.
  */
-static inline int set_tmp_dir() {
+static inline int set_tmp_path() {
     char *home;
 
     if(!(home = getenv("HOME")))
@@ -136,7 +136,7 @@ static int fms_getattr(const char *path, struct stat *stbuf) {
     else {
         cached_information *ci;
         const char *lookup_path = path + 1;             /* Point to char after root directory */
-        int index = slash_index(lookup_path);           /* Look up first forward slash */
+        int index = get_slash_index(lookup_path);           /* Look up first forward slash */
         if(index < 1) {                                 /* If forward slash doesn't exist, we are looking at a photo without a photoset or a photoset. */
             if((ci = photoset_lookup(lookup_path))) {   /* See if path is to a photoset (i.e. a directory ) */
                 set_stbuf(stbuf, S_IFDIR | PERMISSIONS, uid, gid, ci->size, ci->time, 1);
@@ -210,8 +210,8 @@ static int fms_readdir(const char *path, void *buf,
 static int fms_rename(const char *oldpath, const char *newpath) {
     const char *old_path = oldpath + 1;
     const char *new_path = newpath + 1;
-    int old_index = slash_index(old_path);
-    int new_index = slash_index(new_path);
+    int old_index = get_slash_index(old_path);
+    int new_index = get_slash_index(new_path);
 
     #ifdef DEBUG
     printf( "fms_rename: %s to %s\n", oldpath, newpath );
@@ -254,7 +254,7 @@ static int fms_open(const char *path, struct fuse_file_info *fi) {
     printf( "fms_open: %s\n", path );
     #endif
 
-    if(split_path(path, &photoset, &photo))
+    if(get_photoset_photo_from_path(path, &photoset, &photo))
         return FAIL;
 
     wget_path = (char *)malloc(strlen(tmp_path) + strlen(path) + 1);
@@ -334,7 +334,7 @@ static int fms_write(const char *path, const char *buf, size_t size,
     printf( "fms_write: %s\n", path );
     #endif
 
-    if(split_path(path, &photoset, &photo))
+    if(get_photoset_photo_from_path(path, &photoset, &photo))
         return FAIL;
 
     set_photo_dirty( photoset, photo, DIRTY );
@@ -361,7 +361,7 @@ static int fms_release(const char *path, struct fuse_file_info *fi) {
     printf( "fms_release: %s\n", path );
     #endif
 
-    if(split_path(path, &photoset, &photo))
+    if(get_photoset_photo_from_path(path, &photoset, &photo))
         return FAIL;
 
     temp_scratch_path = (char *)malloc(strlen(tmp_path) + strlen(path) + 1);
@@ -394,7 +394,7 @@ static int fms_create(const char *path, mode_t mode, struct fuse_file_info *fi) 
     printf( "fms_create: %s\n", path );
     #endif
 
-    if(split_path(path, &photoset, &photo))
+    if(get_photoset_photo_from_path(path, &photoset, &photo))
         return FAIL;
 
     int retval = create_empty_photo( photoset, photo );
@@ -456,9 +456,9 @@ static struct fuse_operations flickrms_oper = {
 int main(int argc, char *argv[]) {
     int ret;
 
-    if((ret = set_user()))
+    if((ret = set_user_variables()))
         return ret;
-    if((ret = set_tmp_dir()) == FAIL)
+    if((ret = set_tmp_path()) == FAIL)
         return ret;
     if((ret = flickr_cache_init()))
         return ret;

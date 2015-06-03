@@ -66,7 +66,6 @@ static int flickr_init() {
 	/* Read from the config file, ~/.flickcurl.conf */
 	if(flickcurl_config_read_ini(fc, conf_path, "flickr", fc, flickcurl_config_var_handler))
 		return FAIL;
-    
 
 	login = flickcurl_test_login(fc);
 	if(!login)
@@ -631,12 +630,14 @@ int upload_photo( const char *photoset, const char *photo, const char *path ) {
     params.photo_file = path;
     params.description = "Uploaded using FlickrMS";
 	params.title = cp->ci.name;
-/*	params.tags = tags; */
 
 	status = flickcurl_photos_upload_params(fc, &params);
 
-	if(status)
+	if(status) {
+        flickcurl_photosets_addPhoto(fc, cps->ci.id, status->photoid);
+
 		flickcurl_free_upload_status(status);
+    }
 
     cp->ci.dirty = CLEAN;
 
