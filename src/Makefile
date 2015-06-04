@@ -2,7 +2,7 @@ CC:=gcc
 
 export PKG_CONFIG_PATH:=/usr/local/lib/pkgconfig
 
-LIBXMLIC:=`xml2-config --cflags --libs`
+LIBXMLIC:=`pkg-config --cflags --libs libxml-2.0`
 FUSEINC:=`pkg-config --cflags --libs fuse`
 GLIBINC:=`pkg-config --cflags --libs glib-2.0`
 FLKCINC:=`pkg-config --cflags --libs flickcurl`
