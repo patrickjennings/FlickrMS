@@ -160,7 +160,7 @@ static gboolean free_photoset_ht(gpointer key, gpointer value, gpointer user_dat
 
 	g_hash_table_foreach_remove(photo_ht, free_photo_ht, NULL);
     
-    if( g_hash_table_size(photo_ht) == 0 ) {
+    if( cps->ci.dirty == CLEAN && g_hash_table_size(photo_ht) == 0 ) {
         g_hash_table_destroy(photo_ht);
 
         free(key);
@@ -170,7 +170,7 @@ static gboolean free_photoset_ht(gpointer key, gpointer value, gpointer user_dat
         return TRUE;
     }
     else {
-        cps->set = CACHE_UNSET;
+        cps->set = ( cps->ci.dirty == CLEAN ) ? CACHE_UNSET : CACHE_SET;
         return FALSE;
     }
 }
