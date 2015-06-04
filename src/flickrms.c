@@ -427,6 +427,7 @@ static int fms_fgetattr(const char *path, struct stat *stbuf, struct fuse_file_i
 
 static int fms_mkdir(const char *path, mode_t mode) {
     (void)mode;
+    char *temp_scratch_path;
     const char *photoset = path + 1;
 
     #ifdef DEBUG
@@ -438,6 +439,14 @@ static int fms_mkdir(const char *path, mode_t mode) {
 
     if(create_empty_photoset(photoset))
         return FAIL;
+
+    temp_scratch_path = (char *)malloc(strlen(tmp_path) + strlen(path) + 1);
+    strcpy(temp_scratch_path, tmp_path);
+    strcat(temp_scratch_path, path);
+
+    mkdir(temp_scratch_path, PERMISSIONS);      /* Create photoset tmp directory */
+
+    free(temp_scratch_path);
 
     return SUCCESS;
 }

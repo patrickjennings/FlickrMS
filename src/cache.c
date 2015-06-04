@@ -664,9 +664,18 @@ int upload_photo(const char *photoset, const char *photo, const char *path) {
 	status = flickcurl_photos_upload_params(fc, &params);
 
 	if(status) {
-        flickcurl_photosets_addPhoto(fc, cps->ci.id, status->photoid);
+        if( cps->ci.dirty == DIRTY ) { // if photoset is dirty, create it
+            char * photosetid = flickcurl_photosets_create(fc, cps->ci.name, NULL, status->photoid, NULL);
 
-		flickcurl_free_upload_status(status);
+            if( photosetid ) {
+                cps->ci.id = photosetid;
+            }
+        }
+        else if( strcmp( cps->ci.id, "" ) ) { // if photoset has an id, add new photo to it
+            flickcurl_photosets_addPhoto(fc, cps->ci.id, status->photoid);
+
+            flickcurl_free_upload_status(status);
+        }
     }
 
     cp->ci.dirty = CLEAN;
