@@ -183,8 +183,10 @@ static int fms_readdir(const char *path, void *buf,
 
     if(!strcmp(path, "/")) {                            /* Path is to mounted directory */
         num_names = get_photo_names(emptystr, &names);  /* Get all photo names with no photoset attached */
-        for(i = 0; i < num_names; i++)
+        for(i = 0; i < num_names; i++) {
             filler(buf, names[i], NULL, 0);
+            free(names[i]);
+        }
         if(num_names > 0)
             free(names);
         num_names = get_photoset_names(&names);         /* We are going to want to fill the photosets as well */
