@@ -1,6 +1,6 @@
 ==Authors==
-Created by:	Patrick Jennings
-Website:	https://github.com/patrickjennings/FlickrMS
+Created by: Patrick Jennings
+Website:    https://github.com/patrickjennings/FlickrMS
 
 
 ==About==
@@ -40,10 +40,10 @@ https://github.com/patrickjennings/FlickrMS/issues
 
 ==Installation==
 Dependencies:
-	FUSE
-		http://fuse.sourceforge.net/
-	>Flickcurl-1.26
-		http://librdf.org/flickcurl/
+    FUSE
+        http://fuse.sourceforge.net/
+    >Flickcurl-1.26
+        http://librdf.org/flickcurl/
     pkg-config
         git://anongit.freedesktop.org/pkg-config
     libxml-2.0

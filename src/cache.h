@@ -4,10 +4,10 @@
 #include "common.h"
 
 typedef struct {
-	char *name;
-	char *id;
-	time_t time;
-	unsigned int size;
+    char *name;
+    char *id;
+    time_t time;
+    unsigned int size;
     unsigned short dirty;
 } cached_information;
 
