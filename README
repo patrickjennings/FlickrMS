@@ -40,10 +40,18 @@ https://github.com/patrickjennings/FlickrMS/issues
 
 ==Installation==
 Dependencies:
-	FUSE (tested on fuse-2.8.5)
+	FUSE
 		http://fuse.sourceforge.net/
 	>Flickcurl-1.26
 		http://librdf.org/flickcurl/
+    pkg-config
+        git://anongit.freedesktop.org/pkg-config
+    libxml-2.0
+        http://www.xmlsoft.org/
+    glib-2.0
+        https://developer.gnome.org/glib/
+    libcurl
+        http://curl.haxx.se/libcurl/
 
 FlickrMS comes with a custom Makefile that can be used to create the binary
 application. To compile and create the binary, simply type:
