@@ -134,7 +134,7 @@ static int fms_getattr(const char *path, struct stat *stbuf) {
         retval = SUCCESS;
     }
     else {
-        cached_information *ci;
+        cached_information *ci = NULL;
         const char *lookup_path = path + 1;             /* Point to char after root directory */
         int index = get_slash_index(lookup_path);           /* Look up first forward slash */
         if(index < 1) {                                 /* If forward slash doesn't exist, we are looking at a photo without a photoset or a photoset. */
@@ -164,7 +164,8 @@ static int fms_getattr(const char *path, struct stat *stbuf) {
                 free(photoset);
             }
         }
-        free_cached_info(ci);
+        if(ci)
+            free_cached_info(ci);
     }
     return retval;
 }

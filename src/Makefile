@@ -1,6 +1,6 @@
 CC:=gcc
 
-export PKG_CONFIG_PATH:=/usr/local/lib/pkgconfig
+export PKG_CONFIG_PATH:=$PKG_CONFIG_PATH:/usr/local/lib/pkgconfig
 
 LIBXMLIC:=`pkg-config --cflags --libs libxml-2.0`
 FUSEINC:=`pkg-config --cflags --libs fuse`
@@ -10,7 +10,7 @@ CURLINC:=`pkg-config --cflags --libs libcurl`
 INCLUDES:=$(FUSEINC) $(GLIBINC) $(FLKCINC) $(CURLINC) $(LIBXMLIC)
 
 OPTS:=-march=native -O2 -pipe
-CFLAGS:=-Wall -W -Werror -Wextra -g
+CFLAGS:=$(OPTS) -Wall -W -Werror -Wextra
 
 OBJS:=flickrms.o cache.o wget.o conf.o
 

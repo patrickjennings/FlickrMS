@@ -673,9 +673,9 @@ int upload_photo(const char *photoset, const char *photo, const char *path) {
         }
         else if( strcmp( cps->ci.id, "" ) ) { // if photoset has an id, add new photo to it
             flickcurl_photosets_addPhoto(fc, cps->ci.id, status->photoid);
-
-            flickcurl_free_upload_status(status);
         }
+
+        flickcurl_free_upload_status(status);
     }
 
     cp->ci.dirty = CLEAN;
