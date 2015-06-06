@@ -669,6 +669,7 @@ int upload_photo(const char *photoset, const char *photo, const char *path) {
 
             if( photosetid ) {
                 cps->ci.id = photosetid;
+                cps->ci.dirty = CLEAN;
             }
         }
         else if( strcmp( cps->ci.id, "" ) ) { // if photoset has an id, add new photo to it
