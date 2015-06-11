@@ -39,8 +39,7 @@ typedef struct {
 
 
 static GHashTable *photoset_ht;             /* The photoset cache */
-static cached_photoset *cached_nophotoset;  /* A pointer to the cached information of photos NOT in a photoset */
-static pthread_mutex_t cache_lock;          /* To make thread safe */
+static pthread_rwlock_t cache_lock;         /* To make thread safe */
 static time_t last_cleaned;                 /* To age/invalidate the cache */
 
 static flickcurl *fc;
@@ -178,6 +177,7 @@ static gboolean free_photoset_ht(gpointer key, gpointer value, gpointer user_dat
 /*
  * Checks whether the cache should be cleaned. Time can be changed in
  * DEFAULT_CACHE_TIMEOUT define.
+ * Assumes there is a read lock initiated
 */
 static int check_cache() {
     flickcurl_photoset **fps;
@@ -187,26 +187,28 @@ static int check_cache() {
     if((time(NULL) - last_cleaned) < DEFAULT_CACHE_TIMEOUT)
         return SUCCESS;
 
+    pthread_rwlock_unlock(&cache_lock); /* Release the read lock and lock for writting */
+    pthread_rwlock_wrlock(&cache_lock);
+
     /* Wipe clean entries from the cache. */
     g_hash_table_foreach_remove(photoset_ht, free_photoset_ht, NULL);
 
     if( !g_hash_table_lookup( photoset_ht, "" ) ) {
         /* Create an empty photoset container for the photos not in a photoset */
         if(new_cached_photoset(&cps, "", ""))
-            return FAIL;
+            goto fail;
 
-        cached_nophotoset = cps;
         g_hash_table_insert(photoset_ht, strdup(""), cps);
     }
 
     if(!(fps = flickcurl_photosets_getList(fc, NULL)))
-        return FAIL;
+        goto fail;
 
     /* Add the photosets to the cache */
     for(i = 0; fps[i]; i++) {
         if( !g_hash_table_lookup( photoset_ht, fps[i]->title ) ) {
             if(new_cached_photoset(&cps, fps[i]->title, fps[i]->id))
-                return FAIL;
+                goto fail;
             g_hash_table_insert(photoset_ht, strdup(cps->ci.name), cps);
         }
     }
@@ -214,7 +216,15 @@ static int check_cache() {
 
     last_cleaned = time(NULL);
 
+    pthread_rwlock_unlock(&cache_lock);
+    pthread_rwlock_rdlock(&cache_lock);
+
     return SUCCESS;
+
+fail: pthread_rwlock_unlock(&cache_lock);
+    pthread_rwlock_rdlock(&cache_lock);
+
+    return FAIL;
 }
 
 /*
@@ -222,6 +232,7 @@ static int check_cache() {
  * (it would be a waste to load all flickr info if not needed).
  * This method needs to be called in order to fill the photoset cache
  * with photo information.
+ * Assumes there is a read lock initiated
  */
 static int check_photoset_cache(cached_photoset *cps) {
     flickcurl_photo **fp;
@@ -236,14 +247,27 @@ static int check_photoset_cache(cached_photoset *cps) {
         return SUCCESS;
     }
 
+    pthread_rwlock_unlock(&cache_lock); /* Release the read lock and lock for writting */
+    pthread_rwlock_wrlock(&cache_lock);
+
+    if(cps->set) {
+        pthread_rwlock_unlock(&cache_lock);
+        pthread_rwlock_rdlock(&cache_lock);
+        return SUCCESS;
+    }
+
     /* Are we searching for photos in a photoset or not? */
-    if(cps == cached_nophotoset) {      /* Get photos NOT in a photoset */
+    if( !strcmp( cps->ci.id, "" ) ) {      /* Get photos NOT in a photoset */
         if(!(fp = flickcurl_photos_getNotInSet(fc, 0, 0, NULL, NULL, 0, "date_taken", -1, -1))) {
+            pthread_rwlock_unlock(&cache_lock);
+            pthread_rwlock_rdlock(&cache_lock);
             return FAIL;
         }
     }
     else {                  /* Add the photos of the photoset into the cache */
         if(!(fp = flickcurl_photosets_getPhotos(fc, cps->ci.id, "date_taken", 0, -1, -1))) {
+            pthread_rwlock_unlock(&cache_lock);
+            pthread_rwlock_rdlock(&cache_lock);
             return FAIL;
         }
     }
@@ -275,8 +299,12 @@ static int check_photoset_cache(cached_photoset *cps) {
 
         memset(&tm, 0, sizeof(struct tm));
 
-        if(!(cp = (cached_photo *)malloc(sizeof(cached_photo))))
+        if(!(cp = (cached_photo *)malloc(sizeof(cached_photo)))) {
+            pthread_rwlock_unlock(&cache_lock);
+            pthread_rwlock_rdlock(&cache_lock);
             return FAIL;
+        }
+
         cp->uri = flickcurl_photo_as_source_uri(fp[j], GET_PHOTO_SIZE);
         cp->ci.name = strdup(title);
         cp->ci.id = strdup(id);
@@ -304,6 +332,9 @@ static int check_photoset_cache(cached_photoset *cps) {
     cps->ci.size = j;
     cps->set = CACHE_SET;
 
+    pthread_rwlock_unlock(&cache_lock);
+    pthread_rwlock_rdlock(&cache_lock);
+
     return SUCCESS;
 }
 
@@ -316,8 +347,7 @@ int flickr_cache_init() {
         return FAIL;
     photoset_ht = g_hash_table_new(g_str_hash, g_str_equal);
     last_cleaned = 0;
-    pthread_mutex_init(&cache_lock, NULL);
-    check_cache();
+    pthread_rwlock_init(&cache_lock, NULL);
     return SUCCESS;
 }
 
@@ -326,9 +356,10 @@ int flickr_cache_init() {
 */
 void flickr_cache_kill() {
     /* Wipe existing cache */
+    pthread_rwlock_wrlock(&cache_lock);
+    pthread_rwlock_destroy(&cache_lock);
     g_hash_table_foreach_remove(photoset_ht, free_photoset_ht, NULL);
     g_hash_table_destroy(photoset_ht);
-    pthread_mutex_destroy(&cache_lock);
     flickr_kill();
 }
 
@@ -350,9 +381,9 @@ int get_photoset_names(char ***names) {
     if(!names)
         return FAIL;
 
-    pthread_mutex_lock(&cache_lock);
+    pthread_rwlock_rdlock(&cache_lock);
     if(check_cache()) {
-        pthread_mutex_unlock(&cache_lock);
+        pthread_rwlock_unlock(&cache_lock);
         return FAIL;
     }
 
@@ -360,7 +391,7 @@ int get_photoset_names(char ***names) {
     size = g_hash_table_size(photoset_ht) - 1;
 
     if(!(*names = (char **)malloc(sizeof(char *) * size))) {
-        pthread_mutex_unlock(&cache_lock);
+        pthread_rwlock_unlock(&cache_lock);
         return FAIL;
     }
 
@@ -373,7 +404,7 @@ int get_photoset_names(char ***names) {
             i++;
         }
     }
-    pthread_mutex_unlock(&cache_lock);
+    pthread_rwlock_unlock(&cache_lock);
     return i;
 }
 
@@ -394,7 +425,7 @@ int get_photo_names(const char *photoset, char ***names) {
     if(!names || !photoset)
         return FAIL;
 
-    pthread_mutex_lock(&cache_lock);
+    pthread_rwlock_rdlock(&cache_lock);
     if(check_cache())
         goto fail;
 
@@ -420,10 +451,10 @@ int get_photo_names(const char *photoset, char ***names) {
     }
     printf( "\n\n\n" );
 
-    pthread_mutex_unlock(&cache_lock);
+    pthread_rwlock_unlock(&cache_lock);
     return size;
 
-fail:   pthread_mutex_unlock(&cache_lock);
+fail:   pthread_rwlock_unlock(&cache_lock);
     return FAIL;
 }
 
@@ -435,7 +466,7 @@ cached_information *photoset_lookup(const char *photoset) {
     cached_photoset *cps;
     cached_information *ci_copy = 0;
 
-    pthread_mutex_lock(&cache_lock);
+    pthread_rwlock_rdlock(&cache_lock);
     if(check_cache())
         goto end;
 
@@ -443,13 +474,14 @@ cached_information *photoset_lookup(const char *photoset) {
     if(cps)
         ci_copy = copy_cached_info(&(cps->ci));
 
-end:    pthread_mutex_unlock(&cache_lock);
+end:    pthread_rwlock_unlock(&cache_lock);
     return ci_copy;
 }
 
 /*
  * Internal method to get the cached_photo of
  * a particular photo.
+ * Assumes there is a read lock initiated
  */
 static cached_photo *get_photo(const char *photoset, const char *photo) {
     cached_photoset *cps;
@@ -477,10 +509,10 @@ cached_information *photo_lookup(const char *photoset, const char *photo) {
     cached_photo *cp;
     cached_information *ci_copy = 0;
 
-    pthread_mutex_lock(&cache_lock);
+    pthread_rwlock_rdlock(&cache_lock);
     if((cp = get_photo(photoset, photo)))
         ci_copy = copy_cached_info(&(cp->ci));
-    pthread_mutex_unlock(&cache_lock);
+    pthread_rwlock_unlock(&cache_lock);
 
     return ci_copy;
 }
@@ -492,13 +524,13 @@ char *get_photo_uri(const char *photoset, const char *photo) {
     cached_photo *cp;
     char *uri_copy = 0;
 
-    pthread_mutex_lock(&cache_lock);
+    pthread_rwlock_rdlock(&cache_lock);
     if((cp = get_photo(photoset, photo))) {
         if( cp->uri ) {
             uri_copy = strdup(cp->uri);
         }
     }
-    pthread_mutex_unlock(&cache_lock);
+    pthread_rwlock_unlock(&cache_lock);
 
     return uri_copy;
 }
@@ -513,12 +545,16 @@ int set_photo_name(const char *photoset, const char *photo, const char *newname)
     if(!strcmp(photo, newname))
         return SUCCESS;
 
-    if(!(ci = photo_lookup(photoset, photo)))
+    if(!(ci = photo_lookup(photoset, photo))) {
         return FAIL;
+    }
+
+    pthread_rwlock_wrlock(&cache_lock);
 
     ret = flickcurl_photos_setMeta(fc, ci->id, newname, "");
     last_cleaned = 0;
     free_cached_info(ci);
+    pthread_rwlock_unlock(&cache_lock);
     return ret;
 }
 
@@ -530,13 +566,16 @@ int set_photo_name(const char *photoset, const char *photo, const char *newname)
 int set_photo_size(const char *photoset, const char *photo, unsigned int newsize) {
     cached_photo *cp;
 
-    pthread_mutex_lock(&cache_lock);
+    pthread_rwlock_rdlock(&cache_lock);
     if(!(cp = get_photo(photoset, photo))) {
-        pthread_mutex_unlock(&cache_lock);
+        pthread_rwlock_unlock(&cache_lock);
         return FAIL;
     }
+
+    pthread_rwlock_unlock(&cache_lock);
+    pthread_rwlock_wrlock(&cache_lock);
     cp->ci.size = newsize;
-    pthread_mutex_unlock(&cache_lock);
+    pthread_rwlock_unlock(&cache_lock);
 
     return SUCCESS;
 }
@@ -544,13 +583,16 @@ int set_photo_size(const char *photoset, const char *photo, unsigned int newsize
 int set_photo_dirty(const char *photoset, const char *photo, unsigned short dirty) {
     cached_photo *cp;
 
-    pthread_mutex_lock(&cache_lock);
+    pthread_rwlock_rdlock(&cache_lock);
     if(!(cp = get_photo(photoset, photo))) {
-        pthread_mutex_unlock(&cache_lock);
+        pthread_rwlock_unlock(&cache_lock);
         return FAIL;
     }
+
+    pthread_rwlock_unlock(&cache_lock);
+    pthread_rwlock_wrlock(&cache_lock);
     cp->ci.dirty = dirty;
-    pthread_mutex_unlock(&cache_lock);
+    pthread_rwlock_unlock(&cache_lock);
 
     return SUCCESS;
 }
@@ -559,13 +601,13 @@ int get_photo_dirty(const char *photoset, const char *photo) {
     cached_photo *cp;
     unsigned short dirty;
 
-    pthread_mutex_lock(&cache_lock);
+    pthread_rwlock_rdlock(&cache_lock);
     if(!(cp = get_photo(photoset, photo))) {
-        pthread_mutex_unlock(&cache_lock);
+        pthread_rwlock_unlock(&cache_lock);
         return FAIL;
     }
     dirty = cp->ci.dirty;
-    pthread_mutex_unlock(&cache_lock);
+    pthread_rwlock_unlock(&cache_lock);
 
     return dirty;
 }
@@ -574,7 +616,7 @@ int create_empty_photoset(const char *photoset) {
     cached_photoset *cps;
     int retval = FAIL;
 
-    pthread_mutex_lock(&cache_lock);
+    pthread_rwlock_wrlock(&cache_lock);
 
     if(g_hash_table_lookup(photoset_ht, photoset))
         goto fail;
@@ -596,7 +638,7 @@ int create_empty_photoset(const char *photoset) {
 
     retval = SUCCESS;
 
-fail: pthread_mutex_unlock(&cache_lock);
+fail: pthread_rwlock_unlock(&cache_lock);
     return retval;
 }
 
@@ -605,7 +647,7 @@ int create_empty_photo(const char *photoset, const char *photo) {
     cached_photo *cp;
     int retval = FAIL;
 
-    pthread_mutex_lock(&cache_lock);
+    pthread_rwlock_wrlock(&cache_lock);
 
     cps = g_hash_table_lookup(photoset_ht, photoset);
 
@@ -633,7 +675,7 @@ int create_empty_photo(const char *photoset, const char *photo) {
 
     retval = SUCCESS;
 
-fail: pthread_mutex_unlock(&cache_lock);
+fail: pthread_rwlock_unlock(&cache_lock);
     return retval;
 }
 
@@ -644,7 +686,7 @@ int upload_photo(const char *photoset, const char *photo, const char *path) {
     cached_photo *cp;
     int retval = FAIL;
 
-    pthread_mutex_lock(&cache_lock);
+    pthread_rwlock_wrlock(&cache_lock);
 
     cps = g_hash_table_lookup(photoset_ht, photoset);
 
@@ -685,7 +727,7 @@ int upload_photo(const char *photoset, const char *photo, const char *path) {
 
     retval = SUCCESS;
 
-fail:   pthread_mutex_unlock(&cache_lock);
+fail: pthread_rwlock_unlock(&cache_lock);
     return retval;
 }
 
