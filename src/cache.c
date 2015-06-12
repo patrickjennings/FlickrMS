@@ -441,15 +441,12 @@ int get_photo_names(const char *photoset, char ***names) {
     if(!(*names = (char **)malloc(sizeof(char *) * size)))
         goto fail;
 
-    printf( "\n\n\n" );
     /* Add each photo to the list. We add the keys since the names may be duplicates/NULL */
     g_hash_table_iter_init(&iter, cps->photo_ht);
     for(i = 0; g_hash_table_iter_next(&iter, (gpointer)&key, (gpointer)&cp); i++)
     {
-        printf( "Name: %s, id: %s dirty: %d, key: %s, size: %d\n", cp->ci.name, cp->ci.id, cp->ci.dirty, key, cp->ci.size );
         (*names)[i] = strdup(key);
     }
-    printf( "\n\n\n" );
 
     pthread_rwlock_unlock(&cache_lock);
     return size;
@@ -464,17 +461,17 @@ fail:   pthread_rwlock_unlock(&cache_lock);
  */
 cached_information *photoset_lookup(const char *photoset) {
     cached_photoset *cps;
-    cached_information *ci_copy = 0;
+    cached_information *ci_copy = NULL;
 
     pthread_rwlock_rdlock(&cache_lock);
     if(check_cache())
-        goto end;
+        goto fail;
 
     cps = g_hash_table_lookup(photoset_ht, photoset);
     if(cps)
         ci_copy = copy_cached_info(&(cps->ci));
 
-end:    pthread_rwlock_unlock(&cache_lock);
+fail: pthread_rwlock_unlock(&cache_lock);
     return ci_copy;
 }
 
@@ -485,20 +482,17 @@ end:    pthread_rwlock_unlock(&cache_lock);
  */
 static cached_photo *get_photo(const char *photoset, const char *photo) {
     cached_photoset *cps;
-    cached_photo *cp;
 
     if(check_cache())
-        return 0;
+        return NULL;
 
     if(!(cps = g_hash_table_lookup(photoset_ht, photoset)))
-        return 0;
+        return NULL;
 
     if(check_photoset_cache(cps))
-        return 0;
+        return NULL;
 
-    cp = g_hash_table_lookup(cps->photo_ht, photo);
-
-    return cp;
+    return g_hash_table_lookup(cps->photo_ht, photo);
 }
 
 /* Looks for the photo specified in the arguments.
@@ -507,7 +501,7 @@ static cached_photo *get_photo(const char *photoset, const char *photo) {
  */
 cached_information *photo_lookup(const char *photoset, const char *photo) {
     cached_photo *cp;
-    cached_information *ci_copy = 0;
+    cached_information *ci_copy = NULL;
 
     pthread_rwlock_rdlock(&cache_lock);
     if((cp = get_photo(photoset, photo)))
@@ -522,7 +516,7 @@ cached_information *photo_lookup(const char *photoset, const char *photo) {
  */
 char *get_photo_uri(const char *photoset, const char *photo) {
     cached_photo *cp;
-    char *uri_copy = 0;
+    char *uri_copy = NULL;
 
     pthread_rwlock_rdlock(&cache_lock);
     if((cp = get_photo(photoset, photo))) {
@@ -539,28 +533,53 @@ char *get_photo_uri(const char *photoset, const char *photo) {
  * new name.
  */
 int set_photo_name(const char *photoset, const char *photo, const char *newname) {
-    cached_information *ci;
-    int ret;
+    cached_photo *cp;
 
-    if(!strcmp(photo, newname))
-        return SUCCESS;
-
-    if(!(ci = photo_lookup(photoset, photo))) {
+    pthread_rwlock_rdlock(&cache_lock);
+    if(!(cp = get_photo(photoset, photo))) {
+        pthread_rwlock_unlock(&cache_lock);
         return FAIL;
     }
 
+    pthread_rwlock_unlock(&cache_lock);
     pthread_rwlock_wrlock(&cache_lock);
 
-    ret = flickcurl_photos_setMeta(fc, ci->id, newname, "");
+    flickcurl_photos_setMeta(fc, cp->ci.id, newname, "");
     last_cleaned = 0;
-    free_cached_info(ci);
     pthread_rwlock_unlock(&cache_lock);
-    return ret;
+    return SUCCESS;
 }
 
-/*int set_photos_photoset(const char *oldset, const char *newset, const char *photo) {
+/* Renames the photoset
+ */
+int set_photoset_name(const char *photoset, const char *newname) {
+    void *key, *value;
+    cached_photoset *cps;
+    int retval = FAIL;
 
-}*/
+    pthread_rwlock_wrlock(&cache_lock);
+
+    if( g_hash_table_lookup_extended(photoset_ht, photoset, &key, &value) ) {
+        cps = value;
+
+        if( cps->ci.dirty == CLEAN )
+            if( flickcurl_photosets_editMeta( fc, cps->ci.id, newname, NULL ) )
+                goto fail;
+
+        free( cps->ci.name );
+        cps->ci.name = strdup(newname);
+
+        g_hash_table_remove(photoset_ht, photoset);
+        g_hash_table_insert(photoset_ht, strdup(newname), cps);
+
+        free(key);
+        retval = SUCCESS;
+    }
+
+fail: pthread_rwlock_unlock(&cache_lock);
+
+    return retval;
+}
 
 /* Sets the photos size */
 int set_photo_size(const char *photoset, const char *photo, unsigned int newsize) {

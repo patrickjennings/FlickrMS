@@ -221,7 +221,9 @@ static int fms_rename(const char *oldpath, const char *newpath) {
     #endif
 
     if(old_index < 1 && new_index < 1)
-        set_photo_name(emptystr, old_path, new_path);
+        if( set_photo_name(emptystr, old_path, new_path) )
+            if( set_photoset_name(old_path, new_path) )
+                return FAIL;
     /*else {
         char *old_set = (char *)malloc(old_index + 1);
         char *new_set = (char *)malloc(new_index + 1);

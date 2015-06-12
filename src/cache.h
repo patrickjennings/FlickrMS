@@ -23,6 +23,7 @@ cached_information *photo_lookup(const char *photoset, const char *photo);
 void free_cached_info(cached_information *ci);
 char *get_photo_uri(const char *photoset, const char *photo);
 int set_photo_name(const char *photoset, const char *photo, const char *newname);
+int set_photoset_name(const char *photoset, const char *newname);
 int set_photo_size(const char *photoset, const char *photo, unsigned int newsize);
 int set_photo_dirty(const char *photoset, const char *photo, unsigned short dirty);
 int get_photo_dirty(const char *photoset, const char *photo);
