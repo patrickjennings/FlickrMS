@@ -456,6 +456,12 @@ static int fms_mkdir(const char *path, mode_t mode) {
     return SUCCESS;
 }
 
+int fms_statfs(const char *path, struct statvfs* stbuf)
+{
+    (void)path;
+    return statvfs(tmp_path, stbuf);
+}
+
 
 /**
  * Main function
@@ -473,7 +479,8 @@ static struct fuse_operations flickrms_oper = {
     .rename = fms_rename,
     .create = fms_create,
     .fgetattr = fms_fgetattr,
-    .mkdir = fms_mkdir
+    .mkdir = fms_mkdir,
+    .statfs = fms_statfs
 };
 
 int main(int argc, char *argv[]) {
