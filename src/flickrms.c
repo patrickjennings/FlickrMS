@@ -13,8 +13,9 @@
 #include "wget.h"
 
 
-#define PERMISSIONS     0755
-#define TMP_DIR_NAME    ".flickrms"
+#define PERMISSIONS         0755
+#define TMP_DIR_NAME        ".flickrms"
+#define THUMBNAIL_TIMEOUT   1200
 
 
 static uid_t uid;   /* The user id of the user that mounted the filesystem */
@@ -265,10 +266,6 @@ static int fms_open(const char *path, struct fuse_file_info *fi) {
     wget_path = (char *)malloc(strlen(tmp_path) + strlen(path) + 1);
     set_photoset_tmp_dir(wget_path, tmp_path, photoset);
 
-    #ifdef DEBUG
-    printf( "tmp_path: %s, photoset: %s, photo: %s\n", tmp_path, photoset, photo );
-    #endif
-
     uri = get_photo_uri(photoset, photo);
     if( uri ) {
         mkdir(wget_path, PERMISSIONS);      /* Create photoset temp directory if it doesn't exist */
@@ -290,20 +287,12 @@ static int fms_open(const char *path, struct fuse_file_info *fi) {
         strcat(wget_path, path);
     }
 
-    #ifdef DEBUG
-    printf( "opening %s\n", wget_path );
-    #endif
-
     if(stat(wget_path, &st_buf)) {
         free( wget_path );
         return FAIL;
     }
 
-    #ifdef DEBUG
-    printf( "Time: %ld\n", ( time(NULL) - st_buf.st_mtime ) );
-    #endif
-
-    if((time(NULL) - st_buf.st_mtime) >= 1200) {
+    if((time(NULL) - st_buf.st_mtime) >= THUMBNAIL_TIMEOUT) {
         if(wget(uri, wget_path) < 0) {
             free( wget_path );
             return FAIL;
