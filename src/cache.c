@@ -86,7 +86,7 @@ static void flickr_kill() {
 **/
 
 /* Creates a new cached_photoset using the pointer and name/id provided */
-static int new_cached_photoset(cached_photoset **cps, char *name, char *id) {
+static int new_cached_photoset(cached_photoset **cps, flickcurl_photoset *fps) {
     unsigned int i;
     cached_information *ci;
 
@@ -95,10 +95,10 @@ static int new_cached_photoset(cached_photoset **cps, char *name, char *id) {
         return -1;
 
     ci = &((*cps)->ci);
-    ci->name = strdup(name);
-    ci->id = strdup(id);
+    ci->name = strdup( fps ? fps->title : "" );
+    ci->id = strdup( fps ? fps->id : "" );
     ci->time = 0;
-    ci->size = 0;
+    ci->size = fps?fps->photos_count:0;
     ci->dirty = CLEAN;
     (*cps)->set = CACHE_UNSET;
     (*cps)->photo_ht = g_hash_table_new(g_str_hash, g_str_equal);
@@ -198,7 +198,7 @@ static int check_cache() {
 
     if( !g_hash_table_lookup( photoset_ht, "" ) ) {
         /* Create an empty photoset container for the photos not in a photoset */
-        if(new_cached_photoset(&cps, "", ""))
+        if(new_cached_photoset(&cps, NULL))
             return FAIL;
 
         g_hash_table_insert(photoset_ht, strdup(""), cps);
@@ -210,7 +210,7 @@ static int check_cache() {
     /* Add the photosets to the cache */
     for(i = 0; fps[i]; i++) {
         if( !g_hash_table_lookup( photoset_ht, fps[i]->title ) ) {
-            if(new_cached_photoset(&cps, fps[i]->title, fps[i]->id))
+            if(new_cached_photoset(&cps, fps[i]))
                 return FAIL;
             g_hash_table_insert(photoset_ht, strdup(cps->ci.name), cps);
         }
