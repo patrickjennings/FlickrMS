@@ -684,10 +684,10 @@ int upload_photo(const char *photoset, const char *photo, const char *path) {
 
     cps = g_hash_table_lookup(photoset_ht, photoset);
 
-    if( !cps )
+    if(!cps)
         goto fail;
 
-    if( !( cp = g_hash_table_lookup( cps->photo_ht, photo  ) ) )
+    if(!(cp = g_hash_table_lookup(cps->photo_ht, photo)))
         goto fail;
 
     memset(&params, '\0', sizeof(flickcurl_upload_params));
@@ -718,6 +718,43 @@ int upload_photo(const char *photoset, const char *photo, const char *path) {
     cp->ci.dirty = CLEAN;
 
     cps->set = CACHE_UNSET;
+
+    retval = SUCCESS;
+
+fail: pthread_rwlock_unlock(&cache_lock);
+    return retval;
+}
+
+int set_photo_photoset(const char *photoset, const char *photo, const char *new_photoset) {
+    cached_photoset *cps;
+    cached_photoset *new_cps;
+    cached_photo *cp;
+    int retval = FAIL;
+
+    pthread_rwlock_wrlock(&cache_lock);
+
+    cps = g_hash_table_lookup(photoset_ht, photoset);
+    new_cps = g_hash_table_lookup(photoset_ht, new_photoset);
+
+    if(!cps || !new_cps)
+        goto fail;
+
+    if(!(cp = g_hash_table_lookup(cps->photo_ht, photo)))
+        goto fail;
+
+    if(strcmp(cps->ci.id, "")) {
+        flickcurl_photosets_removePhoto(fc, cps->ci.id, cp->ci.id);
+    }
+
+    if(strcmp(new_cps->ci.id, "")) {
+        flickcurl_photosets_addPhoto(fc, new_cps->ci.id, cp->ci.id);
+    }
+
+    g_hash_table_foreach_remove(cps->photo_ht, free_photo_ht, NULL);
+    g_hash_table_foreach_remove(new_cps->photo_ht, free_photo_ht, NULL);
+
+    cps->set = CACHE_UNSET;
+    new_cps->set = CACHE_UNSET;
 
     retval = SUCCESS;
 

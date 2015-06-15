@@ -211,33 +211,39 @@ static int fms_readdir(const char *path, void *buf,
     return SUCCESS;
 }
 
-static int fms_rename(const char *oldpath, const char *newpath) {
-    const char *old_path = oldpath + 1;
-    const char *new_path = newpath + 1;
-    int old_index = get_slash_index(old_path);
-    int new_index = get_slash_index(new_path);
+static int fms_rename(const char *old_path, const char *new_path) {
+    char *old_photo;
+    char *old_photoset;
+    char *new_photo;
+    char *new_photoset;
 
-    #ifdef DEBUG
-    printf( "fms_rename: %s to %s\n", oldpath, newpath );
-    #endif
+    printf( "fms_rename: %s to %s\n", old_path, new_path );
 
-    if(old_index < 1 && new_index < 1)
-        if( set_photo_name(emptystr, old_path, new_path) )
-            if( set_photoset_name(old_path, new_path) )
+    if(get_photoset_photo_from_path(old_path, &old_photoset, &old_photo))
+        return FAIL;
+
+    if(get_photoset_photo_from_path(new_path, &new_photoset, &new_photo))
+        return FAIL;
+
+    if(strcmp(old_photo, new_photo)) {
+        if(set_photo_name(old_photoset, old_photo, new_photo)) {
+            if(set_photoset_name(old_path + 1, new_path + 1))
                 return FAIL;
-    /*else {
-        char *old_set = (char *)malloc(old_index + 1);
-        char *new_set = (char *)malloc(new_index + 1);
-        if(!old_set || !new_set)
-            return -ENOMEM;
-        strncpy(old_set, old_path, old_index);
-        strncpy(new_set, new_path, new_index);
-        old_set[old_index] = '\0';
-        new_set[new_index] = '\0';
+        }
+        else {
+            free(old_photo);
+            old_photo = strdup(new_photo);
+        }
+    }
 
-        set_photo_name(old_set, old_path + old_index + 1, new_path + new_index + 1);
-    }*/
+    if(strcmp(old_photoset, new_photoset))
+        if(set_photo_photoset(old_photoset, old_photo, new_photoset))
+            return FAIL;
 
+    free(old_photo);
+    free(old_photoset);
+    free(new_photo);
+    free(new_photoset);
     return SUCCESS;
 }
 
