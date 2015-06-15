@@ -451,10 +451,39 @@ static int fms_mkdir(const char *path, mode_t mode) {
     return SUCCESS;
 }
 
-int fms_statfs(const char *path, struct statvfs* stbuf)
-{
+int fms_statfs(const char *path, struct statvfs* stbuf) {
     (void)path;
     return statvfs(tmp_path, stbuf);
+}
+
+int fms_chmod(const char *path, mode_t mode) {
+    char *temp_scratch_path;
+    int retval = FAIL;
+
+    temp_scratch_path = (char *)malloc(strlen(tmp_path) + strlen(path) + 1);
+    strcpy(temp_scratch_path, tmp_path);
+    strcat(temp_scratch_path, path);
+
+    retval = chmod(temp_scratch_path, mode);
+
+    free(temp_scratch_path);
+
+    return retval;
+}
+
+int fms_chown(const char *path, uid_t uid, gid_t gid) {
+    char *temp_scratch_path;
+    int retval = FAIL;
+
+    temp_scratch_path = (char *)malloc(strlen(tmp_path) + strlen(path) + 1);
+    strcpy(temp_scratch_path, tmp_path);
+    strcat(temp_scratch_path, path);
+
+    retval = chown(temp_scratch_path, uid, gid);
+
+    free(temp_scratch_path);
+
+    return retval;
 }
 
 
@@ -475,7 +504,9 @@ static struct fuse_operations flickrms_oper = {
     .create = fms_create,
     .fgetattr = fms_fgetattr,
     .mkdir = fms_mkdir,
-    .statfs = fms_statfs
+    .statfs = fms_statfs,
+    .chmod = fms_chmod,
+    .chown = fms_chown
 };
 
 int main(int argc, char *argv[]) {

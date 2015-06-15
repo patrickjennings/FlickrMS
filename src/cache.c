@@ -85,7 +85,7 @@ static void flickr_kill() {
  * ===Cache Methods===
 **/
 
-/* Creates a new cached_photoset using the pointer and name/id provided */
+/* Creates a new cached_photoset using the photoset or a blank one if NULL is passed in */
 static int new_cached_photoset(cached_photoset **cps, flickcurl_photoset *fps) {
     unsigned int i;
     cached_information *ci;
