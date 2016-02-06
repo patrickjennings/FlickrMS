@@ -10,6 +10,10 @@ int wget_init() {
     return SUCCESS;
 }
 
+void wget_destroy() {
+    curl_global_cleanup();
+}
+
 int wget(const char *in, const char *out) {
     CURL *curl;
     CURLcode res;

@@ -482,6 +482,7 @@ int main(int argc, char *argv[]) {
     ret = fuse_main(argc, argv, &flickrms_oper, NULL);
 
     flickr_cache_kill();
+    wget_destroy();
     free(tmp_path);
     return ret;
 }

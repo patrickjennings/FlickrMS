@@ -4,6 +4,7 @@
 #include "common.h"
 
 int wget_init();
+void wget_destroy();
 int wget(const char *in, const char *out);
 
 #endif
