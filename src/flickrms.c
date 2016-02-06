@@ -13,9 +13,9 @@
 #include "wget.h"
 
 
-#define PERMISSIONS         0755
-#define TMP_DIR_NAME        ".flickrms"
-#define THUMBNAIL_TIMEOUT   1200
+#define PERMISSIONS     0755
+#define TMP_DIR_NAME    ".flickrms"
+#define PHOTO_TIMEOUT   1200
 
 
 static uid_t uid;   /* The user id of the user that mounted the filesystem */
@@ -284,8 +284,8 @@ static int fms_open(const char *path, struct fuse_file_info *fi) {
         return FAIL;
     }
 
-    if((time(NULL) - st_buf.st_mtime) > THUMBNAIL_TIMEOUT) {
-        if(wget(uri, wget_path) < 0) {
+    if((time(NULL) - st_buf.st_mtime) > PHOTO_TIMEOUT) {
+        if(uri && wget(uri, wget_path) < 0) {
             free( wget_path );
             return FAIL;
         }

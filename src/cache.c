@@ -18,7 +18,7 @@
 #include "conf.h"
 
 
-#define DEFAULT_CACHE_TIMEOUT   30
+#define DEFAULT_CACHE_TIMEOUT   1200
 
 #define GET_PHOTO_SIZE      'l'
 
@@ -298,7 +298,7 @@ static int check_photoset_cache(cached_photoset *cps) {
         cp->ci.size = 1024;                 /* Trick so that file managers do not think file is empty... */
         cp->ci.dirty = CLEAN;
 
-        sscanf(fp[j]->fields[PHOTO_FIELD_dates_taken].string, "%d-%d-%d %d:%d:%d",
+        sscanf(fp[j]->fields[PHOTO_FIELD_dates_taken].string, "%4d-%2d-%2d %2d:%2d:%2d",
           &(tm.tm_year), &(tm.tm_mon), &(tm.tm_mday), &(tm.tm_hour), &(tm.tm_min), &(tm.tm_sec));
         tm.tm_year = tm.tm_year - 1900;     /* Years since 1990 */
         tm.tm_mon--;                        /* Programmers start with 0... */
