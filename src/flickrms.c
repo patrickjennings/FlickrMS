@@ -126,10 +126,6 @@ static int fms_getattr(const char *path, struct stat *stbuf) {
     int retval = -ENOENT;
     memset((void *)stbuf, 0, sizeof(struct stat));
 
-    #ifdef DEBUG
-    printf( "fms_getattr: %s\n", path );
-    #endif
-
     if(!strcmp(path, "/")) { /* Path is mount directory */
         set_stbuf(stbuf, S_IFDIR | PERMISSIONS, uid, gid, 0, 0, 1); /* FIXME: Total size of all files... or leave at 0? */
         retval = SUCCESS;
@@ -179,10 +175,6 @@ static int fms_readdir(const char *path, void *buf,
     (void)offset;
     (void)fi;
 
-    #ifdef DEBUG
-    printf( "fms_readdir: %s\n", path );
-    #endif
-
     if(!strcmp(path, "/")) {                            /* Path is to mounted directory */
         num_names = get_photo_names(emptystr, &names);  /* Get all photo names with no photoset attached */
         for(i = 0; i < num_names; i++) {
@@ -216,8 +208,6 @@ static int fms_rename(const char *old_path, const char *new_path) {
     char *old_photoset;
     char *new_photo;
     char *new_photoset;
-
-    printf( "fms_rename: %s to %s\n", old_path, new_path );
 
     if(get_photoset_photo_from_path(old_path, &old_photoset, &old_photo))
         return FAIL;
@@ -262,10 +252,6 @@ static int fms_open(const char *path, struct fuse_file_info *fi) {
     int fd;
     struct stat st_buf;
 
-    #ifdef DEBUG
-    printf( "fms_open: %s\n", path );
-    #endif
-
     if(get_photoset_photo_from_path(path, &photoset, &photo))
         return FAIL;
 
@@ -298,7 +284,7 @@ static int fms_open(const char *path, struct fuse_file_info *fi) {
         return FAIL;
     }
 
-    if((time(NULL) - st_buf.st_mtime) >= THUMBNAIL_TIMEOUT) {
+    if((time(NULL) - st_buf.st_mtime) > THUMBNAIL_TIMEOUT) {
         if(wget(uri, wget_path) < 0) {
             free( wget_path );
             return FAIL;
@@ -319,9 +305,6 @@ static int fms_open(const char *path, struct fuse_file_info *fi) {
 static int fms_read(const char *path, char *buf, size_t size,
   off_t offset, struct fuse_file_info *fi) {
     (void)path;
-    #ifdef DEBUG
-    printf( "fms_read: %s\n", path );
-    #endif
     return pread(fi->fh, buf, size, offset);
 }
 
@@ -329,10 +312,6 @@ static int fms_write(const char *path, const char *buf, size_t size,
   off_t offset, struct fuse_file_info *fi) {
     (void)path;
     char *photoset, *photo;
-
-    #ifdef DEBUG
-    printf( "fms_write: %s\n", path );
-    #endif
 
     if(get_photoset_photo_from_path(path, &photoset, &photo))
         return FAIL;
@@ -346,9 +325,6 @@ static int fms_write(const char *path, const char *buf, size_t size,
 
 static int fms_flush(const char *path, struct fuse_file_info *fi) {
     (void)path;
-    #ifdef DEBUG
-    printf( "fms_flush: %s\n", path );
-    #endif
     return close(fi->fh);
 }
 
@@ -356,10 +332,6 @@ static int fms_release(const char *path, struct fuse_file_info *fi) {
     (void)fi;
     char *photoset, *photo;
     char *temp_scratch_path;  
-
-    #ifdef DEBUG
-    printf( "fms_release: %s\n", path );
-    #endif
 
     if(get_photoset_photo_from_path(path, &photoset, &photo))
         return FAIL;
@@ -369,9 +341,6 @@ static int fms_release(const char *path, struct fuse_file_info *fi) {
     strcat(temp_scratch_path, path);
 
     if( get_photo_dirty( photoset, photo ) == DIRTY ) {
-        #ifdef DEBUG
-        printf( "\t%s is dirty\n", path );
-        #endif
         upload_photo( photoset, photo, temp_scratch_path );
     }
 
@@ -389,10 +358,6 @@ static int fms_create(const char *path, mode_t mode, struct fuse_file_info *fi) 
     int fd;
     char *photoset, *photo;
     char *temp_scratch_path;
-
-    #ifdef DEBUG
-    printf( "fms_create: %s\n", path );
-    #endif
 
     if(get_photoset_photo_from_path(path, &photoset, &photo))
         return FAIL;
@@ -419,9 +384,6 @@ static int fms_create(const char *path, mode_t mode, struct fuse_file_info *fi) 
 /* Only called after create. For new files. */
 static int fms_fgetattr(const char *path, struct stat *stbuf, struct fuse_file_info *fi) {
     (void)path;
-    #ifdef DEBUG
-    printf( "fms_fgetattr: %s\n", path );
-    #endif
     return fstat(fi->fh, stbuf);
 }
 
@@ -429,10 +391,6 @@ static int fms_mkdir(const char *path, mode_t mode) {
     (void)mode;
     char *temp_scratch_path;
     const char *photoset = path + 1;
-
-    #ifdef DEBUG
-    printf( "fms_mkdir: %s\n", path );
-    #endif
 
     if(get_slash_index(photoset) >= 0) // Can only mkdir on first level
         return FAIL;
@@ -517,6 +475,8 @@ int main(int argc, char *argv[]) {
     if((ret = set_tmp_path()) == FAIL)
         return ret;
     if((ret = flickr_cache_init()))
+        return ret;
+    if((ret = wget_init()))
         return ret;
 
     ret = fuse_main(argc, argv, &flickrms_oper, NULL);

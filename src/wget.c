@@ -4,8 +4,10 @@
 
 #include "wget.h"
 
-size_t write_wget(void *ptr, size_t size, size_t nmemb, FILE *stream) {
-    return fwrite(ptr, size, nmemb, stream);
+int wget_init() {
+    if(curl_global_init(CURL_GLOBAL_ALL))
+        return FAIL;
+    return SUCCESS;
 }
 
 int wget(const char *in, const char *out) {
@@ -21,7 +23,6 @@ int wget(const char *in, const char *out) {
 
     // Set the curl easy options
     curl_easy_setopt(curl, CURLOPT_URL, in);
-    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_wget);
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, fp);
 
     res = curl_easy_perform(curl);  // Perform the download and write

@@ -4,8 +4,6 @@
 #define SUCCESS 0
 #define FAIL    -1
 
-#define DEBUG   1
-
 #define CLEAN   0
 #define DIRTY   1
 
