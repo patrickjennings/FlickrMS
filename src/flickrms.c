@@ -8,6 +8,7 @@
 #include <errno.h>
 #include <unistd.h>
 #include <time.h>
+#include <ftw.h>
 
 #include "cache.h"
 #include "wget.h"
@@ -102,6 +103,19 @@ static inline int set_tmp_path() {
     strcat(tmp_path, TMP_DIR_NAME);
 
     return 0 - mkdir(tmp_path, PERMISSIONS);
+}
+
+static int remove_tmp_file(const char *fpath, const struct stat *sb, int typeflag, struct FTW *ftwbuf) {
+    (void)sb;
+    (void)typeflag;
+    if(ftwbuf->level == 0)
+        return SUCCESS;
+    return remove(fpath);
+}
+
+static inline void remove_tmp_path() {
+    nftw(tmp_path, remove_tmp_file, 64, FTW_DEPTH | FTW_PHYS);
+    free(tmp_path);
 }
 
 
@@ -483,6 +497,6 @@ int main(int argc, char *argv[]) {
 
     flickr_cache_kill();
     wget_destroy();
-    free(tmp_path);
+    remove_tmp_path();
     return ret;
 }
