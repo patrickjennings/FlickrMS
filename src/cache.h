@@ -31,5 +31,6 @@ int create_empty_photoset(const char *photoset);
 int create_empty_photo(const char *pphotoset, const char *photo);
 int upload_photo(const char *photoset, const char *photo, const char *path);
 int set_photo_photoset(const char *photoset, const char *photo, const char *new_photoset);
+int remove_photo_from_cache(const char *photoset, const char *photo);
 
 #endif

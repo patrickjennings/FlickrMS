@@ -9,6 +9,10 @@
 #include <unistd.h>
 #include <time.h>
 #include <ftw.h>
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-parameter"
+#include <wand/magick_wand.h>
+#pragma GCC diagnostic pop
 
 #include "cache.h"
 #include "wget.h"
@@ -21,6 +25,8 @@
 
 static uid_t uid;   /* The user id of the user that mounted the filesystem */
 static gid_t gid;   /* The group id of the user */
+
+static MagickWand *mw;
 
 static char *tmp_path;
 
@@ -116,6 +122,17 @@ static int remove_tmp_file(const char *fpath, const struct stat *sb, int typefla
 static inline void remove_tmp_path() {
     nftw(tmp_path, remove_tmp_file, 64, FTW_DEPTH | FTW_PHYS);
     free(tmp_path);
+}
+
+static inline int imagemagick_init() {
+    MagickWandGenesis();
+    mw = NewMagickWand();
+    return mw ? SUCCESS : FAIL;
+}
+
+static inline void imagemagick_destroy() {
+    DestroyMagickWand(mw);
+    MagickWandTerminus();
 }
 
 
@@ -281,7 +298,10 @@ static int fms_open(const char *path, struct fuse_file_info *fi) {
 
         if(access(wget_path, F_OK)) {
             if(wget(uri, wget_path) < 0)  {   /* Get the image from flickr and put it into the temp dir if it doesn't already exist. */
-                free( wget_path );
+                free(wget_path);
+                free(uri);
+                free(photo);
+                free(photoset);
                 return FAIL;
             }
         }
@@ -294,13 +314,19 @@ static int fms_open(const char *path, struct fuse_file_info *fi) {
     }
 
     if(stat(wget_path, &st_buf)) {
-        free( wget_path );
+        free(uri);
+        free(wget_path);
+        free(photoset);
+        free(photo);
         return FAIL;
     }
 
     if((time(NULL) - st_buf.st_mtime) > PHOTO_TIMEOUT) {
         if(uri && wget(uri, wget_path) < 0) {
-            free( wget_path );
+            free(uri);
+            free(wget_path);
+            free(photoset);
+            free(photo);
             return FAIL;
         }
     }
@@ -354,13 +380,9 @@ static int fms_release(const char *path, struct fuse_file_info *fi) {
     strcpy(temp_scratch_path, tmp_path);
     strcat(temp_scratch_path, path);
 
-    if( get_photo_dirty( photoset, photo ) == DIRTY ) {
+    if(get_photo_dirty( photoset, photo ) == DIRTY && MagickPingImage(mw, temp_scratch_path)) {
         upload_photo( photoset, photo, temp_scratch_path );
     }
-
-    set_photoset_tmp_dir(temp_scratch_path, tmp_path, photoset);
-
-    rmdir(temp_scratch_path);
 
     free(temp_scratch_path);
     free(photoset);
@@ -458,6 +480,33 @@ int fms_chown(const char *path, uid_t uid, gid_t gid) {
     return retval;
 }
 
+int fms_unlink(const char *path) {
+    char *photoset, *photo;
+    char *temp_scratch_path;
+    int retval = FAIL;
+
+    if(get_photoset_photo_from_path(path, &photoset, &photo))
+        return FAIL;
+
+    if(remove_photo_from_cache(photoset, photo)) {
+        free(photoset);
+        free(photo);
+        return FAIL;
+    }
+
+    temp_scratch_path = (char *)malloc(strlen(tmp_path) + strlen(path) + 1);
+    strcpy(temp_scratch_path, tmp_path);
+    strcat(temp_scratch_path, path);
+
+    retval = unlink(temp_scratch_path);
+
+    free(temp_scratch_path);
+    free(photoset);
+    free(photo);
+
+    return retval;
+}
+
 
 /**
  * Main function
@@ -478,7 +527,8 @@ static struct fuse_operations flickrms_oper = {
     .mkdir = fms_mkdir,
     .statfs = fms_statfs,
     .chmod = fms_chmod,
-    .chown = fms_chown
+    .chown = fms_chown,
+    .unlink = fms_unlink
 };
 
 int main(int argc, char *argv[]) {
@@ -492,11 +542,14 @@ int main(int argc, char *argv[]) {
         return ret;
     if((ret = wget_init()))
         return ret;
+    if((ret = imagemagick_init()))
+        return ret;
 
     ret = fuse_main(argc, argv, &flickrms_oper, NULL);
 
     flickr_cache_kill();
     wget_destroy();
+    imagemagick_destroy();
     remove_tmp_path();
     return ret;
 }

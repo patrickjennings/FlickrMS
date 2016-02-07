@@ -1,10 +1,6 @@
 /**
  * Patrick Jennings
- *
- * TODO: Enhance (performance-wise) thread-safety mechanisms
- *  * Release lock while communicating with Flickr.
- * TODO: Enhance aging/invalidating the cache
- *  * Place cache cleaning in seperate thread. Would require a r/w lock.
+ * flickrms
 **/
 
 #include <flickcurl.h>
@@ -757,6 +753,37 @@ int set_photo_photoset(const char *photoset, const char *photo, const char *new_
     new_cps->set = CACHE_UNSET;
 
     retval = SUCCESS;
+
+fail: pthread_rwlock_unlock(&cache_lock);
+    return retval;
+}
+
+int remove_photo_from_cache(const char *photoset, const char *photo) {
+    void *key, *value;
+    cached_photoset *cps;
+    cached_photo *cp;
+    int retval = FAIL;
+
+    pthread_rwlock_wrlock(&cache_lock);
+
+    if(!(cps = g_hash_table_lookup(photoset_ht, photoset)))
+        goto fail;
+
+    if( g_hash_table_lookup_extended(cps->photo_ht, photo, &key, &value) ) {
+        cp = value;
+
+        if(cp->ci.dirty) {
+            g_hash_table_remove(cps->photo_ht, photo);
+
+            free(cp->uri);
+            free(cp->ci.name);
+            free(cp->ci.id);
+            free(key);
+            free(value);
+
+            retval = SUCCESS;
+        }
+    }
 
 fail: pthread_rwlock_unlock(&cache_lock);
     return retval;

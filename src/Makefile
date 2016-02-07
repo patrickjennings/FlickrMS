@@ -2,12 +2,13 @@ CC:=gcc
 
 export PKG_CONFIG_PATH:=$PKG_CONFIG_PATH:/usr/local/lib/pkgconfig
 
-LIBXMLIC:=`pkg-config --cflags --libs libxml-2.0`
-FUSEINC:=`pkg-config --cflags --libs fuse`
-GLIBINC:=`pkg-config --cflags --libs glib-2.0`
-FLKCINC:=`pkg-config --cflags --libs flickcurl`
-CURLINC:=`pkg-config --cflags --libs libcurl`
-INCLUDES:=$(FUSEINC) $(GLIBINC) $(FLKCINC) $(CURLINC) $(LIBXMLIC)
+LXML:=libxml-2.0
+FUSE:=fuse
+GLIB:=glib-2.0
+FLKC:=flickcurl
+CURL:=libcurl
+IMGM:=MagickWand-config
+INCLUDES:=`pkg-config --libs $(FUSE) $(GLIB) $(FLKC) $(CURL) $(LXML)` `$(IMGM) --libs --ldflags`
 
 OPTS:=-march=native -O2 -pipe
 CFLAGS:=$(OPTS) -Wall -W -Werror -Wextra
@@ -19,19 +20,19 @@ PROJ:=flickrms
 all: $(PROJ)
 
 $(PROJ): $(OBJS)
-	$(CC) -o $@ $^ $(CFLAGS) $(INCLUDES)
+	$(CC) -o $@ $^ $(INCLUDES)
 
 flickrms.o: flickrms.c cache.c wget.c
-	$(CC) $(CFLAGS) $(FUSEINC) -c $<
+	$(CC) $(CFLAGS) `pkg-config --cflags $(FUSE)` `$(IMGM) --cflags` -c $<
 
 cache.o: cache.c conf.c
-	$(CC) $(CFLAGS) $(GLIBINC) $(FLKCINC) $(LIBXMLIC) -c $<
+	$(CC) $(CFLAGS) `pkg-config --cflags $(GLIB) $(FLKC) $(LXML)` -c $<
 
 wget.o: wget.c
-	$(CC) $(CFLAGS) $(CURLINC) -c $<
+	$(CC) $(CFLAGS) `pkg-config --cflags $(CURL)` -c $<
 
 conf.o: conf.c
-	$(CC) $(CFLAGS) $(FLKCINC) $(LIBXMLIC) -c $<
+	$(CC) $(CFLAGS) `pkg-config --cflags $(FLKC) $(LXML)` -c $<
 
 install:
 	cp flickrms /usr/local/bin/

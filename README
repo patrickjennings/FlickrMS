@@ -41,17 +41,19 @@ https://github.com/patrickjennings/FlickrMS/issues
 ==Installation==
 Dependencies:
     FUSE
-        http://fuse.sourceforge.net/
+        http://fuse.sourceforge.net
     Flickcurl-git
         https://github.com/dajobe/flickcurl
     pkg-config
         git://anongit.freedesktop.org/pkg-config
     libxml-2.0
-        http://www.xmlsoft.org/
+        http://www.xmlsoft.org
     glib-2.0
         https://developer.gnome.org/glib/
     libcurl
         http://curl.haxx.se/libcurl/
+    ImageMagick
+        http://www.imagemagick.org
 
 See https://github.com/patrickjennings/FlickrMS/wiki/Installation for more
 information about installing dependencies.
