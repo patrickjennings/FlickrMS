@@ -7,8 +7,8 @@ FUSE:=fuse
 GLIB:=glib-2.0
 FLKC:=flickcurl
 CURL:=libcurl
-IMGM:=MagickWand-config
-INCLUDES:=`pkg-config --libs $(FUSE) $(GLIB) $(FLKC) $(CURL) $(LXML)` `$(IMGM) --libs --ldflags`
+IMGM:=MagickWand
+INCLUDES:=`pkg-config --libs $(FUSE) $(GLIB) $(FLKC) $(CURL) $(LXML) $(IMGM)`
 
 OPTS:=-march=native -O2 -pipe
 CFLAGS:=$(OPTS) -Wall -W -Werror -Wextra
@@ -23,7 +23,7 @@ $(PROJ): $(OBJS)
 	$(CC) -o $@ $^ $(INCLUDES)
 
 flickrms.o: flickrms.c cache.c wget.c
-	$(CC) $(CFLAGS) `pkg-config --cflags $(FUSE)` `$(IMGM) --cflags` -c $<
+	$(CC) $(CFLAGS) `pkg-config --cflags $(FUSE) $(IMGM)` -c $<
 
 cache.o: cache.c conf.c
 	$(CC) $(CFLAGS) `pkg-config --cflags $(GLIB) $(FLKC) $(LXML)` -c $<
