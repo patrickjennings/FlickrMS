@@ -10,7 +10,7 @@ CURL:=libcurl
 IMGM:=MagickWand
 INCLUDES:=`pkg-config --libs $(FUSE) $(GLIB) $(FLKC) $(CURL) $(LXML) $(IMGM)`
 
-OPTS:=-march=native -O2 -pipe
+OPTS:=-g
 CFLAGS:=$(OPTS) -Wall -W -Werror -Wextra
 
 OBJS:=flickrms.o cache.o wget.o conf.o

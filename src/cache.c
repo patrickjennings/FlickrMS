@@ -88,7 +88,7 @@ static int new_cached_photoset(cached_photoset **cps, flickcurl_photoset *fps) {
 
     *cps = (cached_photoset *)malloc(sizeof(cached_photoset));
     if(!cps)
-        return -1;
+        return FAIL;
 
     ci = &((*cps)->ci);
     ci->name = strdup( fps ? fps->title : "" );
@@ -104,13 +104,13 @@ static int new_cached_photoset(cached_photoset **cps, flickcurl_photoset *fps) {
         if(ci->name[i] == '/')
             ci->name[i] = ' ';
     }
-    return 0;
+    return SUCCESS;
 }
 
 static cached_information *copy_cached_info(const cached_information *ci) {
-    cached_information *newci = ci?(cached_information *)malloc(sizeof(cached_information)):0;
+    cached_information *newci = ci?(cached_information *)malloc(sizeof(cached_information)):NULL;
     if(!newci)
-        return 0;
+        return NULL;
     *newci = *ci;
     if( ci->name )
         newci->name = strdup(ci->name);
@@ -260,7 +260,7 @@ static int check_photoset_cache(cached_photoset *cps) {
     /* Add photos to photoset cache */
     for(j = 0; fp[j]; j++) {
         cached_photo *cp;
-        struct tm tm;
+        struct tm tm = {0};
         char *title;
         char *id;
 
@@ -282,8 +282,6 @@ static int check_photoset_cache(cached_photoset *cps) {
             }
         }
 
-        memset(&tm, 0, sizeof(struct tm));
-
         if(!(cp = (cached_photo *)malloc(sizeof(cached_photo)))) {
             return FAIL;
         }
@@ -296,7 +294,7 @@ static int check_photoset_cache(cached_photoset *cps) {
 
         sscanf(fp[j]->fields[PHOTO_FIELD_dates_taken].string, "%4d-%2d-%2d %2d:%2d:%2d",
           &(tm.tm_year), &(tm.tm_mon), &(tm.tm_mday), &(tm.tm_hour), &(tm.tm_min), &(tm.tm_sec));
-        tm.tm_year = tm.tm_year - 1900;     /* Years since 1990 */
+        tm.tm_year = tm.tm_year - 1900;     /* Years since 1900 */
         tm.tm_mon--;                        /* Programmers start with 0... */
         tm.tm_sec--;
         tm.tm_min--;
