@@ -1,4 +1,4 @@
-#define FUSE_USE_VERSION 26
+#define FUSE_USE_VERSION 30
 #define _XOPEN_SOURCE 500
 
 #include <fuse.h>
@@ -11,6 +11,9 @@
 #include <ftw.h>
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-parameter"
+#pragma GCC diagnostic ignored "-Wconversion"
+#pragma GCC diagnostic ignored "-Wfloat-conversion"
+#pragma GCC diagnostic ignored "-Wsign-conversion"
 #include <wand/magick_wand.h>
 #pragma GCC diagnostic pop
 
@@ -41,14 +44,18 @@ static char emptystr[] = "";
  * Returns the first index of a '/' or negative if non exists in the
  * path supplied.
  */
-static int get_slash_index(const char *path) {
-    unsigned int i;
+static size_t get_slash_index(const char *path, unsigned short *found) {
+    size_t i;
+    *found = 0;
     if(!path)
-        return FAIL;
-    for(i = 0; i < strlen(path); i++)
-        if(path[i] == '/')
-            return i;
-    return -1;
+        return 0;
+    for(i = 0; i < strlen(path); i++) {
+        if(path[i] == '/') {
+            *found = 1;
+            break;
+        }
+    }
+    return i;
 }
 
 /* 
@@ -57,16 +64,17 @@ static int get_slash_index(const char *path) {
  * into: photoset = "photosetname" and photo = "photoname"
  */
 static int get_photoset_photo_from_path(const char *path, char **photoset, char **photo) {
-    int i;
+    size_t i;
+    unsigned short found;
     char *path_dup;
 
     path_dup = strdup(path + 1);
-    i = get_slash_index(path_dup);
+    i = get_slash_index(path_dup, &found);
 
     if(!path || !photoset || !photo || !path_dup)
         return FAIL;
 
-    if(i >= 0) {
+    if(found) {
         path_dup[i] = '\0';
         *photoset = strdup(path_dup);
         *photo = strdup(path_dup + i + 1);
@@ -164,8 +172,9 @@ static int fms_getattr(const char *path, struct stat *stbuf) {
     else {
         cached_information *ci = NULL;
         const char *lookup_path = path + 1;             /* Point to char after root directory */
-        int index = get_slash_index(lookup_path);           /* Look up first forward slash */
-        if(index < 1) {                                 /* If forward slash doesn't exist, we are looking at a photo without a photoset or a photoset. */
+        unsigned short found;
+        size_t index = get_slash_index(lookup_path, &found);    /* Look up first forward slash */
+        if(!found) {                                            /* If forward slash doesn't exist, we are looking at a photo without a photoset or a photoset. */
             if((ci = photoset_lookup(lookup_path))) {   /* See if path is to a photoset (i.e. a directory ) */
                 set_stbuf(stbuf, S_IFDIR | PERMISSIONS, uid, gid, ci->size, ci->time, 1);
                 retval = SUCCESS;
@@ -201,7 +210,7 @@ static int fms_getattr(const char *path, struct stat *stbuf) {
 /* Read directory */
 static int fms_readdir(const char *path, void *buf,
   fuse_fill_dir_t filler, off_t offset, struct fuse_file_info *fi) {
-    int num_names, i;
+    unsigned int num_names, i;
     char **names;
     (void)offset;
     (void)fi;
@@ -218,9 +227,6 @@ static int fms_readdir(const char *path, void *buf,
     }
     else
         num_names = get_photo_names(path + 1, &names); /* Get the names of photos in the photoset */
-
-    if(num_names < 0)
-        return -ENOENT;
 
     filler(buf, ".", NULL, 0);
     filler(buf, "..", NULL, 0);
@@ -283,6 +289,8 @@ static int fms_open(const char *path, struct fuse_file_info *fi) {
     int fd;
     struct stat st_buf;
 
+    #define RET(ret) free(wget_path); free(uri); free(photo); free(photoset); return ret;
+
     if(get_photoset_photo_from_path(path, &photoset, &photo))
         return FAIL;
 
@@ -298,11 +306,7 @@ static int fms_open(const char *path, struct fuse_file_info *fi) {
 
         if(access(wget_path, F_OK)) {
             if(wget(uri, wget_path) < 0)  {   /* Get the image from flickr and put it into the temp dir if it doesn't already exist. */
-                free(wget_path);
-                free(uri);
-                free(photo);
-                free(photoset);
-                return FAIL;
+                RET(FAIL)
             }
         }
     }
@@ -314,44 +318,38 @@ static int fms_open(const char *path, struct fuse_file_info *fi) {
     }
 
     if(stat(wget_path, &st_buf)) {
-        free(uri);
-        free(wget_path);
-        free(photoset);
-        free(photo);
-        return FAIL;
+        RET(FAIL)
     }
 
     if((time(NULL) - st_buf.st_mtime) > PHOTO_TIMEOUT) {
         if(uri && wget(uri, wget_path) < 0) {
-            free(uri);
-            free(wget_path);
-            free(photoset);
-            free(photo);
-            return FAIL;
+            RET(FAIL)
         }
     }
 
     fd = open(wget_path, fi->flags);
-    fi->fh = fd;
-    set_photo_size(photoset, photo, st_buf.st_size);
+    if(fd < 0) {
+        RET(-errno)
+    }
 
-    free(uri);
-    free(wget_path);
-    free(photoset);
-    free(photo);
-    return (fd < 0)?FAIL:SUCCESS;
+    fi->fh = (uint64_t)fd;
+    set_photo_size(photoset, photo, (unsigned int)st_buf.st_size);
+
+    RET(SUCCESS)
 }
 
 static int fms_read(const char *path, char *buf, size_t size,
   off_t offset, struct fuse_file_info *fi) {
     (void)path;
-    return pread(fi->fh, buf, size, offset);
+    ssize_t ret = pread((int)fi->fh, buf, size, offset);
+    return (ret < 0) ? -errno : (int)ret;
 }
 
 static int fms_write(const char *path, const char *buf, size_t size,
   off_t offset, struct fuse_file_info *fi) {
     (void)path;
     char *photoset, *photo;
+    ssize_t ret;
 
     if(get_photoset_photo_from_path(path, &photoset, &photo))
         return FAIL;
@@ -360,12 +358,15 @@ static int fms_write(const char *path, const char *buf, size_t size,
 
     free(photoset);
     free(photo);
-    return pwrite(fi->fh, buf, size, offset);
+    ret = pwrite((int)fi->fh, buf, size, offset);
+
+    return (ret < 0) ? -errno : (int)ret;
 }
 
 static int fms_flush(const char *path, struct fuse_file_info *fi) {
     (void)path;
-    return close(fi->fh);
+    int ret = close((int)fi->fh);
+    return (ret < 0) ? -errno : SUCCESS;
 }
 
 static int fms_release(const char *path, struct fuse_file_info *fi) {
@@ -411,24 +412,27 @@ static int fms_create(const char *path, mode_t mode, struct fuse_file_info *fi) 
     strcat(temp_scratch_path, path);
 
     fd = creat(temp_scratch_path, mode);
-    fi->fh = fd;
+    fi->fh = (uint64_t)fd;
 
     free(temp_scratch_path);
-    return (fd < 0)?FAIL:SUCCESS;
+    return (fd < 0) ? -errno : SUCCESS;
 }
 
 /* Only called after create. For new files. */
 static int fms_fgetattr(const char *path, struct stat *stbuf, struct fuse_file_info *fi) {
     (void)path;
-    return fstat(fi->fh, stbuf);
+    int ret = fstat((int)fi->fh, stbuf);
+    return (ret < 0) ? -errno : SUCCESS;
 }
 
 static int fms_mkdir(const char *path, mode_t mode) {
     (void)mode;
     char *temp_scratch_path;
     const char *photoset = path + 1;
+    unsigned short found;
 
-    if(get_slash_index(photoset) >= 0) // Can only mkdir on first level
+    get_slash_index(photoset, &found);
+    if(found)                           // Can only mkdir on first level
         return FAIL;
 
     if(create_empty_photoset(photoset))
@@ -438,7 +442,7 @@ static int fms_mkdir(const char *path, mode_t mode) {
     strcpy(temp_scratch_path, tmp_path);
     strcat(temp_scratch_path, path);
 
-    mkdir(temp_scratch_path, PERMISSIONS);      /* Create photoset tmp directory */
+    mkdir(temp_scratch_path, PERMISSIONS);      // Create photoset tmp directory
 
     free(temp_scratch_path);
 

@@ -10,8 +10,9 @@ CURL:=libcurl
 IMGM:=MagickWand
 INCLUDES:=`pkg-config --libs $(FUSE) $(GLIB) $(FLKC) $(CURL) $(LXML) $(IMGM)`
 
-OPTS:=-g
-CFLAGS:=$(OPTS) -Wall -W -Werror -Wextra
+OPTS:=-mtune=native -march=native -O2 -pipe
+CFLAGS:=$(OPTS) -Wall -W -Werror -Wextra -Wconversion -Wsign-conversion -fstack-protector-strong
+LDFLAGS:=-Wl,-O1,--as-needed,-z,relro
 
 OBJS:=flickrms.o cache.o wget.o conf.o
 
@@ -20,7 +21,7 @@ PROJ:=flickrms
 all: $(PROJ)
 
 $(PROJ): $(OBJS)
-	$(CC) -o $@ $^ $(INCLUDES)
+	$(CC) $(LDFLAGS) -o $@ $^ $(INCLUDES)
 
 flickrms.o: flickrms.c cache.c wget.c
 	$(CC) $(CFLAGS) `pkg-config --cflags $(FUSE) $(IMGM)` -c $<

@@ -94,7 +94,7 @@ static int new_cached_photoset(cached_photoset **cps, flickcurl_photoset *fps) {
     ci->name = strdup( fps ? fps->title : "" );
     ci->id = strdup( fps ? fps->id : "" );
     ci->time = 0;
-    ci->size = fps?fps->photos_count:0;
+    ci->size = fps ? (unsigned int)fps->photos_count : 0;
     ci->dirty = CLEAN;
     (*cps)->set = CACHE_UNSET;
     (*cps)->photo_ht = g_hash_table_new(g_str_hash, g_str_equal);
@@ -227,7 +227,7 @@ static int check_cache() {
  */
 static int check_photoset_cache(cached_photoset *cps) {
     flickcurl_photo **fp;
-    int j;
+    unsigned int j;
 
     if(!cps)
         return FAIL;
@@ -350,18 +350,18 @@ void flickr_cache_kill() {
  *
  * IMPORTANT: Make sure you free(names) after you are done!
  */
-int get_photoset_names(char ***names) {
+unsigned int get_photoset_names(char ***names) {
     GHashTableIter iter;
     char *key;
-    int size, i;
+    unsigned int size, i;
 
     if(!names)
-        return FAIL;
+        return 0;
 
     pthread_rwlock_rdlock(&cache_lock);
     if(check_cache()) {
         pthread_rwlock_unlock(&cache_lock);
-        return FAIL;
+        return 0;
     }
 
     /* We dont want to add the "" photoset (used for photos without a photoset) into this list */
@@ -369,7 +369,7 @@ int get_photoset_names(char ***names) {
 
     if(!(*names = (char **)malloc(sizeof(char *) * size))) {
         pthread_rwlock_unlock(&cache_lock);
-        return FAIL;
+        return 0;
     }
 
     /* Add each photoset to the list. We add the keys since the names may be duplicates/NULL */
@@ -392,15 +392,15 @@ int get_photoset_names(char ***names) {
  * IMPORTANT: Make sure you free(names) (but not the strings within)
  * after you are done!
  */
-int get_photo_names(const char *photoset, char ***names) {
+unsigned int get_photo_names(const char *photoset, char ***names) {
     GHashTableIter iter;
     char *key;
     cached_photoset *cps;
     cached_photo *cp;
-    int i, size;
+    unsigned int i, size;
 
     if(!names || !photoset)
-        return FAIL;
+        return 0;
 
     pthread_rwlock_rdlock(&cache_lock);
     if(check_cache())
@@ -429,7 +429,7 @@ int get_photo_names(const char *photoset, char ***names) {
     return size;
 
 fail:   pthread_rwlock_unlock(&cache_lock);
-    return FAIL;
+    return 0;
 }
 
 /* Looks for the photoset specified in the argument.
