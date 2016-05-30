@@ -1,8 +1,3 @@
-/**
- * Patrick Jennings
- * flickrms
-**/
-
 #include <flickcurl.h>
 #include <unistd.h>
 #include <stdio.h>
