@@ -11,7 +11,7 @@
 
 #define DEFAULT_CACHE_TIMEOUT   1200
 
-#define GET_PHOTO_SIZE      'l'
+#define GET_PHOTO_SIZE      'o'
 
 #define CACHE_UNSET     0
 #define CACHE_SET       1
@@ -242,12 +242,12 @@ static int check_photoset_cache(cached_photoset *cps) {
 
     /* Are we searching for photos in a photoset or not? */
     if( !strcmp( cps->ci.id, "" ) ) {      /* Get photos NOT in a photoset */
-        if(!(fp = flickcurl_photos_getNotInSet(fc, 0, 0, NULL, NULL, 0, "date_taken", -1, -1))) {
+        if(!(fp = flickcurl_photos_getNotInSet(fc, 0, 0, NULL, NULL, 0, "date_taken,url_o,original_format", -1, -1))) {
             return FAIL;
         }
     }
     else {                  /* Add the photos of the photoset into the cache */
-        if(!(fp = flickcurl_photosets_getPhotos(fc, cps->ci.id, "date_taken", 0, -1, -1))) {
+        if(!(fp = flickcurl_photosets_getPhotos(fc, cps->ci.id, "date_taken,url_o,original_format", 0, -1, -1))) {
             return FAIL;
         }
     }
