@@ -9,8 +9,9 @@
 #include "conf.h"
 
 
-#define DEFAULT_CACHE_TIMEOUT   1200
+#define DEFAULT_CACHE_TIMEOUT   1200 /* seconds */
 
+/* Valid sizes: http://librdf.org/flickcurl/api/flickcurl-section-photo.html#flickcurl-photo-as-source-uri */
 #define GET_PHOTO_SIZE      'o'
 
 #define CACHE_UNSET     0

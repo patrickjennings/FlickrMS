@@ -23,7 +23,7 @@
 
 #define PERMISSIONS     0755
 #define TMP_DIR_NAME    ".flickrms"
-#define PHOTO_TIMEOUT   1200
+#define PHOTO_TIMEOUT   1200 /* seconds */
 
 
 static uid_t uid;   /* The user id of the user that mounted the filesystem */
