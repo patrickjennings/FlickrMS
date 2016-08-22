@@ -13,6 +13,8 @@
 
 /* Valid sizes: http://librdf.org/flickcurl/api/flickcurl-section-photo.html#flickcurl-photo-as-source-uri */
 #define GET_PHOTO_SIZE      'o'
+#define PHOTOS_PER_API_CALL 100
+#define PHOTO_EXTRAS        "date_taken,url_o,original_format"
 
 #define CACHE_UNSET     0
 #define CACHE_SET       1
@@ -214,47 +216,14 @@ static int check_cache() {
     return SUCCESS;
 }
 
-/*
- * The photosets are filled dynamically based on which photosets are loaded
- * (it would be a waste to load all flickr info if not needed).
- * This method needs to be called in order to fill the photoset cache
- * with photo information.
- * Assumes there is a lock initiated
- */
-static int check_photoset_cache(cached_photoset *cps) {
-    flickcurl_photo **fp;
-    unsigned int j;
+static int populate_photoset_cache(cached_photoset *cps, flickcurl_photo **fp) {
+    int j = 0;
 
-    if(!cps)
+    if(!fp)
         return FAIL;
-    if(!(cps->photo_ht)) {
-        return FAIL;
-    }
-    if(cps->set) {
-        return SUCCESS;
-    }
-
-    pthread_rwlock_unlock(&cache_lock); /* Release the read lock and lock for writting */
-    pthread_rwlock_wrlock(&cache_lock);
-
-    if(cps->set) {
-        return SUCCESS;
-    }
-
-    /* Are we searching for photos in a photoset or not? */
-    if( !strcmp( cps->ci.id, "" ) ) {      /* Get photos NOT in a photoset */
-        if(!(fp = flickcurl_photos_getNotInSet(fc, 0, 0, NULL, NULL, 0, "date_taken,url_o,original_format", -1, -1))) {
-            return FAIL;
-        }
-    }
-    else {                  /* Add the photos of the photoset into the cache */
-        if(!(fp = flickcurl_photosets_getPhotos(fc, cps->ci.id, "date_taken,url_o,original_format", 0, -1, -1))) {
-            return FAIL;
-        }
-    }
 
     /* Add photos to photoset cache */
-    for(j = 0; fp[j]; j++) {
+    for(; fp[j]; j++) {
         cached_photo *cp;
         struct tm tm = {0};
         char *title;
@@ -264,18 +233,15 @@ static int check_photoset_cache(cached_photoset *cps) {
         id    = fp[j]->id;
 
         /* Check if dirty version already exists in the database. */
-        if( (cp = g_hash_table_lookup( cps->photo_ht, title )) ) {
-            if( !strcmp( cp->ci.id, id ) ) {
+        if((cp = g_hash_table_lookup(cps->photo_ht, title))) {
+            if(!strcmp( cp->ci.id, id))
                 continue;
-            }
         }
-        else if( (cp = g_hash_table_lookup( cps->photo_ht, id ) ) ) {
-            if( !strcmp( cp->ci.id, id ) ) {
+        else if((cp = g_hash_table_lookup(cps->photo_ht, id))) {
+            if(!strcmp(cp->ci.id, id))
                 continue;
-            }
-            else {  /* TODO: Need to figure out what to do here. */
-                continue;
-            }
+            else
+                continue;              /* TODO: Need to figure out what to do here. */
         }
 
         if(!(cp = (cached_photo *)malloc(sizeof(cached_photo)))) {
@@ -303,10 +269,67 @@ static int check_photoset_cache(cached_photoset *cps) {
         else
             g_hash_table_insert(cps->photo_ht, strdup(cp->ci.name), cp);
     }
+
+    return j;
+}
+
+static inline flickcurl_photo **get_photoset_photos(cached_photoset *cps, int page) {
+    flickcurl_photo **fp;
+
+    /* Are we searching for photos in a photoset or not? */
+    if(!strcmp(cps->ci.id, "")) {   /* Get photos NOT in a photoset */
+        if(!(fp = flickcurl_photos_getNotInSet(fc, 0, 0, NULL, NULL, 0, PHOTO_EXTRAS, PHOTOS_PER_API_CALL, page)))
+            return NULL;
+    }
+    else {                          /* Add the photos of the photoset into the cache */
+        if(!(fp = flickcurl_photosets_getPhotos(fc, cps->ci.id, PHOTO_EXTRAS, 0, PHOTOS_PER_API_CALL, page)))
+            return NULL;
+    }
+
+    return fp;
+}
+
+/*
+ * The photosets are filled dynamically based on which photosets are loaded
+ * (it would be a waste to load all flickr info if not needed).
+ * This method needs to be called in order to fill the photoset cache
+ * with photo information.
+ * Assumes there is a lock initiated
+ */
+static int check_photoset_cache(cached_photoset *cps) {
+    flickcurl_photo **fp;
+    unsigned int total_size = 0;
+    int processed = 0;
+    int page = 0;
+
+    if(!cps)
+        return FAIL;
+    if(!(cps->photo_ht))
+        return FAIL;
+    if(cps->set)
+        return SUCCESS;
+
+    pthread_rwlock_unlock(&cache_lock); /* Release the read lock and lock for writting */
+    pthread_rwlock_wrlock(&cache_lock);
+
+    if(cps->set)
+        return SUCCESS;
+
+    while((fp = get_photoset_photos(cps, page++))) {
+        processed = populate_photoset_cache(cps, fp);
+        if(processed < 0)
+            return FAIL;
+
+        total_size += (unsigned int)processed;
+
+        if(processed < PHOTOS_PER_API_CALL)
+            break;
+    }
+
     flickcurl_free_photos(fp);
 
     cps->ci.time = time(NULL);
-    cps->ci.size = j;
+    cps->ci.size = total_size;
     cps->set = CACHE_SET;
 
     return SUCCESS;
