@@ -21,9 +21,29 @@
 #include "wget.h"
 
 
-#define PERMISSIONS     0755
-#define TMP_DIR_NAME    ".flickrms"
-#define PHOTO_TIMEOUT   1200 /* seconds */
+#define PERMISSIONS     0755        /* Cached file permissions. */
+#define TMP_DIR_NAME    ".flickrms" /* Where to place cached photos. */
+#define PHOTO_TIMEOUT   14400       /* In seconds. */
+
+
+/* Determines whether to report the true file size in getattr before the file
+ * has been downloaded locally. The true file size will always be set and cached
+ * after a file has been downloaded (which happens when opening a file). If this
+ * option is set, Flickrms will query the remote server to get only the file
+ * size for each photo from the response headers but not download the photo.
+ * Using the true photo size is recommended for GUI applications as they tend to
+ * stat the file before opening.
+ * Using a fake file size will be much faster for command line usage.
+ */
+#define USE_TRUE_PHOTO_SIZE 1       /* 1 will use the true size. 0 will use a fake size. */
+#define FAKE_PHOTO_SIZE     1024    /* Only used when USE_TRUE_PHOTO_SIZE is set. */
+
+/* Whether to clean the temporary directory on unmount.
+ * The filesystem does not keep track of files that cannot be uploaded to Flickr,
+ * such as lock and hidden files created by file browsers, after the file system
+ * has been destroyed. This option clears the temp dir used for cached files.
+ */
+#define CLEAN_TMP_DIR_UMOUNT 1      /* 1 or 0. */
 
 
 static uid_t uid;   /* The user id of the user that mounted the filesystem */
@@ -32,8 +52,6 @@ static gid_t gid;   /* The group id of the user */
 static MagickWand *mw;
 
 static char *tmp_path;
-
-static char emptystr[] = "";
 
 
 /**
@@ -80,7 +98,7 @@ static int get_photoset_photo_from_path(const char *path, char **photoset, char 
         *photo = strdup(path_dup + i + 1);
     }
     else {
-        *photoset = strdup(emptystr);
+        *photoset = strdup("");
         *photo = strdup(path_dup);
     }
 
@@ -159,6 +177,22 @@ static inline void set_stbuf(struct stat *stbuf, mode_t mode, uid_t uid,
 }
 
 /*
+ * Get photo size if needed.
+ */
+static int process_photo(const char *photoset, const char *photo, cached_information *ci) {
+    if(USE_TRUE_PHOTO_SIZE && ci->size == PHOTO_SIZE_UNSET) {
+        int photo_size = get_url_content_length(ci->uri);
+
+        if(photo_size < 0)
+            return FAIL;
+
+        ci->size = (unsigned int)photo_size;
+        set_photo_size(photoset, photo, (unsigned int)photo_size);
+    }
+    return SUCCESS;
+}
+
+/*
  * Gets the attributes (stat) of the node at path.
  */
 static int fms_getattr(const char *path, struct stat *stbuf) {
@@ -166,26 +200,32 @@ static int fms_getattr(const char *path, struct stat *stbuf) {
     memset((void *)stbuf, 0, sizeof(struct stat));
 
     if(!strcmp(path, "/")) { /* Path is mount directory */
-        set_stbuf(stbuf, S_IFDIR | PERMISSIONS, uid, gid, 0, 0, 1); /* FIXME: Total size of all files... or leave at 0? */
+        /* FIXME: Total size of all files... or leave at 0? */
+        set_stbuf(stbuf, S_IFDIR | PERMISSIONS, uid, gid, 0, 0, 1);
         retval = SUCCESS;
     }
     else {
         cached_information *ci = NULL;
-        const char *lookup_path = path + 1;             /* Point to char after root directory */
+        /* Point to charcter after root directory */
+        const char *lookup_path = path + 1;
         unsigned short found;
         size_t index = get_slash_index(lookup_path, &found);    /* Look up first forward slash */
-        if(!found) {                                            /* If forward slash doesn't exist, we are looking at a photo without a photoset or a photoset. */
+        /* If forward slash doesn't exist, we are looking at a photo without a photoset or a photoset. */
+        if(!found) {
             if((ci = photoset_lookup(lookup_path))) {   /* See if path is to a photoset (i.e. a directory ) */
                 set_stbuf(stbuf, S_IFDIR | PERMISSIONS, uid, gid, ci->size, ci->time, 1);
                 retval = SUCCESS;
             }
-            else if((ci = photo_lookup(emptystr, lookup_path))) { /* See if path is to a photo (i.e. a file ) */
+            else if((ci = photo_lookup("", lookup_path))) { /* See if path is to a photo (i.e. a file ) */
+                process_photo("", lookup_path, ci);
                 set_stbuf(stbuf, S_IFREG | PERMISSIONS, uid, gid, ci->size, ci->time, 1);
                 retval = SUCCESS;
             }
         }
-        else {                                          /* If forward slash does exist, it means that we have a photo with a photoset (the chars before
-                                                           the slash are the photoset name and the chars after the slash are the photo name. */
+        else {
+            /* If forward slash does exist, it means that we have a photo with a photoset (the chars before
+             * the slash are the photoset name and the chars after the slash are the photo name.
+             */
             char *photoset = (char *)malloc(index + 1);
             if(!photoset)
                 retval = -ENOMEM;
@@ -195,6 +235,7 @@ static int fms_getattr(const char *path, struct stat *stbuf) {
 
                 ci = photo_lookup(photoset, lookup_path + index + 1);   /* Look for the photo */
                 if(ci) {
+                    process_photo(photoset, lookup_path + index + 1, ci);
                     set_stbuf(stbuf, S_IFREG | PERMISSIONS, uid, gid, ci->size, ci->time, 1);
                     retval = SUCCESS;
                 }
@@ -215,8 +256,8 @@ static int fms_readdir(const char *path, void *buf,
     (void)offset;
     (void)fi;
 
-    if(!strcmp(path, "/")) {                            /* Path is to mounted directory */
-        num_names = get_photo_names(emptystr, &names);  /* Get all photo names with no photoset attached */
+    if(!strcmp(path, "/")) {                      /* Path is to mounted directory */
+        num_names = get_photo_names("", &names);  /* Get all photo names with no photoset attached */
         for(i = 0; i < num_names; i++) {
             filler(buf, names[i], NULL, 0);
             free(names[i]);
@@ -298,14 +339,15 @@ static int fms_open(const char *path, struct fuse_file_info *fi) {
     set_photoset_tmp_dir(wget_path, tmp_path, photoset);
 
     uri = get_photo_uri(photoset, photo);
-    if( uri ) {
+    if(uri) {
         mkdir(wget_path, PERMISSIONS);      /* Create photoset temp directory if it doesn't exist */
 
         strcpy(wget_path, tmp_path);
         strcat(wget_path, path);
 
         if(access(wget_path, F_OK)) {
-            if(wget(uri, wget_path) < 0)  {   /* Get the image from flickr and put it into the temp dir if it doesn't already exist. */
+            /* Get the image from flickr and put it into the temp dir if it doesn't already exist. */
+            if(wget(uri, wget_path) < 0) {
                 RET(FAIL)
             }
         }
@@ -554,6 +596,9 @@ int main(int argc, char *argv[]) {
     flickr_cache_kill();
     wget_destroy();
     imagemagick_destroy();
-    remove_tmp_path();
+
+    if(CLEAN_TMP_DIR_UMOUNT)
+        remove_tmp_path();
+
     return ret;
 }

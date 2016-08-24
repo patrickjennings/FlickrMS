@@ -9,12 +9,17 @@
 #include "conf.h"
 
 
-#define DEFAULT_CACHE_TIMEOUT   1200 /* seconds */
+#define DEFAULT_CACHE_TIMEOUT   14400 /* In seconds. */
 
 /* Valid sizes: http://librdf.org/flickcurl/api/flickcurl-section-photo.html#flickcurl-photo-as-source-uri */
 #define GET_PHOTO_SIZE      'o'
 #define PHOTOS_PER_API_CALL 100
 #define PHOTO_EXTRAS        "date_taken,url_o,original_format"
+
+
+/* Photo parameters */
+#define SAFETY_LEVEL    1
+#define CONTENT_TYPE    1
 
 #define CACHE_UNSET     0
 #define CACHE_SET       1
@@ -28,7 +33,6 @@ typedef struct {
 
 typedef struct {
     cached_information ci;
-    char *uri;
 } cached_photo;
 
 
@@ -131,7 +135,7 @@ static gboolean free_photo_ht(gpointer key, gpointer value, gpointer user_data) 
     cached_photo *cp = value;
 
     if( cp->ci.dirty == CLEAN ) {
-        free(cp->uri);
+        free(cp->ci.uri);
         free(cp->ci.name);
         free(cp->ci.id);
         free(key);
@@ -153,7 +157,7 @@ static gboolean free_photoset_ht(gpointer key, gpointer value, gpointer user_dat
 
     g_hash_table_foreach_remove(photo_ht, free_photo_ht, NULL);
 
-    if( cps->ci.dirty == CLEAN && g_hash_table_size(photo_ht) == 0 ) {
+    if(cps->ci.dirty == CLEAN && g_hash_table_size(photo_ht) == 0) {
         g_hash_table_destroy(photo_ht);
 
         free(key);
@@ -248,10 +252,10 @@ static int populate_photoset_cache(cached_photoset *cps, flickcurl_photo **fp) {
             return FAIL;
         }
 
-        cp->uri = flickcurl_photo_as_source_uri(fp[j], GET_PHOTO_SIZE);
+        cp->ci.uri = flickcurl_photo_as_source_uri(fp[j], GET_PHOTO_SIZE);
         cp->ci.name = strdup(title);
         cp->ci.id = strdup(id);
-        cp->ci.size = 1024;                 /* Trick so that file managers do not think file is empty... */
+        cp->ci.size = PHOTO_SIZE_UNSET;
         cp->ci.dirty = CLEAN;
 
         sscanf(fp[j]->fields[PHOTO_FIELD_dates_taken].string, "%4d-%2d-%2d %2d:%2d:%2d",
@@ -324,9 +328,9 @@ static int check_photoset_cache(cached_photoset *cps) {
 
         if(processed < PHOTOS_PER_API_CALL)
             break;
-    }
 
-    flickcurl_free_photos(fp);
+        flickcurl_free_photos(fp);
+    }
 
     cps->ci.time = time(NULL);
     cps->ci.size = total_size;
@@ -516,8 +520,8 @@ char *get_photo_uri(const char *photoset, const char *photo) {
 
     pthread_rwlock_rdlock(&cache_lock);
     if((cp = get_photo(photoset, photo))) {
-        if( cp->uri ) {
-            uri_copy = strdup(cp->uri);
+        if(cp->ci.uri) {
+            uri_copy = strdup(cp->ci.uri);
         }
     }
     pthread_rwlock_unlock(&cache_lock);
@@ -676,7 +680,7 @@ int create_empty_photo(const char *photoset, const char *photo) {
     cp->ci.id = strdup("");
     cp->ci.dirty = DIRTY;
     cp->ci.time = time(NULL);
-    cp->ci.size = 1024;
+    cp->ci.size = PHOTO_SIZE_UNSET;
 
     g_hash_table_insert(cps->photo_ht, strdup(cp->ci.name), cp);
 
@@ -704,10 +708,9 @@ int upload_photo(const char *photoset, const char *photo, const char *path) {
         goto fail;
 
     memset(&params, '\0', sizeof(flickcurl_upload_params));
-    params.safety_level = 1;    /* default safety */
-    params.content_type = 1;    /* default photo */
+    params.safety_level = SAFETY_LEVEL;    /* default safety */
+    params.content_type = CONTENT_TYPE;    /* default photo */
     params.photo_file = path;
-    params.description = "Uploaded using FlickrMS";
     params.title = cp->ci.name;
 
     status = flickcurl_photos_upload_params(fc, &params);
@@ -792,7 +795,7 @@ int remove_photo_from_cache(const char *photoset, const char *photo) {
         if(cp->ci.dirty) {
             g_hash_table_remove(cps->photo_ht, photo);
 
-            free(cp->uri);
+            free(cp->ci.uri);
             free(cp->ci.name);
             free(cp->ci.id);
             free(key);

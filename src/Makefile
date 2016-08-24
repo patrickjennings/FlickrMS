@@ -12,7 +12,7 @@ INCLUDES:=`pkg-config --libs $(FUSE) $(GLIB) $(FLKC) $(CURL) $(LXML) $(IMGM)`
 
 OPTS:=-mtune=native -march=native -O2 -pipe
 CFLAGS:=$(OPTS) -Wall -W -Werror -Wextra -Wconversion -Wsign-conversion -fstack-protector-strong
-LDFLAGS:=-Wl,-O1,--as-needed,-z,relro
+LDFLAGS:=-lm -Wl,-O1,--as-needed,-z,relro
 
 OBJS:=flickrms.o cache.o wget.o conf.o
 

@@ -1,5 +1,6 @@
 #include <stdio.h>
-#include <string.h>
+#include <stdlib.h>
+#include <math.h>
 #include <curl/curl.h>
 
 #include "wget.h"
@@ -35,6 +36,7 @@ int wget(const char *in, const char *out) {
     // Set the curl easy options
     curl_easy_setopt(curl, CURLOPT_URL, in);
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, fp);
+    //curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);
 
     res = curl_easy_perform(curl);  // Perform the download and write
 
@@ -43,3 +45,40 @@ int wget(const char *in, const char *out) {
     return res;
 }
 
+static size_t throw_away(void *ptr, size_t size, size_t nmemb, void *data)
+{
+    (void)ptr;
+    (void)data;
+    return (size_t)(size * nmemb);
+}
+
+/* Perform a HEAD request to the url to get the Content Length from
+ * the headers. Does not get the body.
+ */
+int get_url_content_length(const char *url) {
+    CURL *curl;
+    CURLcode res;
+    double content_length;
+
+    if(!(curl = curl_easy_duphandle(curl_global)))
+        return FAIL;
+
+    // Set the curl easy options
+    curl_easy_setopt(curl, CURLOPT_URL, url);
+    curl_easy_setopt(curl, CURLOPT_NOBODY, 1); // Use HEADER request
+    curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, throw_away);
+    curl_easy_setopt(curl, CURLOPT_HEADER, 0L);
+    //curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);
+
+    res = curl_easy_perform(curl);
+
+    if(res) {
+        curl_easy_cleanup(curl);
+        return FAIL;
+    }
+
+    res = curl_easy_getinfo(curl, CURLINFO_CONTENT_LENGTH_DOWNLOAD, &content_length);
+    curl_easy_cleanup(curl);
+
+    return (res) ? FAIL : (int)round(content_length);
+}
