@@ -180,7 +180,7 @@ static inline void set_stbuf(struct stat *stbuf, mode_t mode, uid_t uid,
  * Get photo size if needed.
  */
 static int process_photo(const char *photoset, const char *photo, cached_information *ci) {
-    if(ci->size == PHOTO_SIZE_UNSET) {
+    if(ci->size == PHOTO_SIZE_UNSET && ci->uri) {
         int photo_size = FAKE_PHOTO_SIZE;
 
         if(USE_TRUE_PHOTO_SIZE) {

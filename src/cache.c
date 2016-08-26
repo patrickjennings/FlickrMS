@@ -43,6 +43,15 @@ static time_t last_cleaned;                 /* To age/invalidate the cache */
 static flickcurl *fc;
 
 
+static inline cached_photo *create_cached_photo() {
+    return (cached_photo *)calloc(1, sizeof(cached_photo));
+}
+
+static inline cached_photoset *create_cached_photoset() {
+    return (cached_photoset *)calloc(1, sizeof(cached_photoset));
+}
+
+
 /*
  * Initialize the flickcurl connection
 */
@@ -88,13 +97,13 @@ static int new_cached_photoset(cached_photoset **cps, flickcurl_photoset *fps) {
     unsigned int i;
     cached_information *ci;
 
-    *cps = (cached_photoset *)malloc(sizeof(cached_photoset));
+    *cps = create_cached_photoset();
     if(!cps)
         return FAIL;
 
     ci = &((*cps)->ci);
-    ci->name = strdup( fps ? fps->title : "" );
-    ci->id = strdup( fps ? fps->id : "" );
+    ci->name = strdup(fps ? fps->title : "");
+    ci->id = strdup(fps ? fps->id : "");
     ci->time = 0;
     ci->size = fps ? (unsigned int)fps->photos_count : 0;
     ci->dirty = CLEAN;
@@ -248,7 +257,7 @@ static int populate_photoset_cache(cached_photoset *cps, flickcurl_photo **fp) {
                 continue;              /* TODO: Need to figure out what to do here. */
         }
 
-        if(!(cp = (cached_photo *)malloc(sizeof(cached_photo)))) {
+        if(!(cp = create_cached_photo())) {
             return FAIL;
         }
 
@@ -390,7 +399,7 @@ unsigned int get_photoset_names(char ***names) {
     /* We dont want to add the "" photoset (used for photos without a photoset) into this list */
     size = g_hash_table_size(photoset_ht) - 1;
 
-    if(!(*names = (char **)malloc(sizeof(char *) * size))) {
+    if(!(*names = (char **)malloc(sizeof(*names) * size))) {
         pthread_rwlock_unlock(&cache_lock);
         return 0;
     }
@@ -438,7 +447,7 @@ unsigned int get_photo_names(const char *photoset, char ***names) {
 
     size = g_hash_table_size(cps->photo_ht);
 
-    if(!(*names = (char **)malloc(sizeof(char *) * size)))
+    if(!(*names = (char **)malloc(sizeof(*names) * size)))
         goto fail;
 
     /* Add each photo to the list. We add the keys since the names may be duplicates/NULL */
@@ -633,10 +642,8 @@ int create_empty_photoset(const char *photoset) {
         goto fail;
 
     /* The new empty photoset */
-    if(!(cps = (cached_photoset *)malloc(sizeof(cached_photoset))))
+    if(!(cps = create_cached_photoset()))
         goto fail;
-
-    memset(cps, 0, sizeof(cached_photoset));
 
     cps->ci.name = strdup(photoset);
     cps->ci.id = strdup("");
@@ -671,10 +678,8 @@ int create_empty_photo(const char *photoset, const char *photo) {
         goto fail;
 
     /* The new empty photo */
-    if(!(cp = (cached_photo *)malloc(sizeof(cached_photo))))
+    if(!(cp = create_cached_photo()))
         goto fail;
-
-    memset(cp, 0, sizeof(cached_photo));
 
     cp->ci.name = strdup(photo);
     cp->ci.id = strdup("");
