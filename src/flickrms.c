@@ -196,6 +196,22 @@ static int process_photo(const char *photoset, const char *photo, cached_informa
     return SUCCESS;
 }
 
+static int prime_photo_size_cache(const char *photoset, char **names, unsigned int num_names) {
+    unsigned int i;
+
+    #pragma omp parallel for
+    for(i = 0; i < num_names; i++) {
+        cached_information *ci = photo_lookup(photoset, names[i]);
+
+        if(ci) {
+            process_photo(photoset, names[i], ci);
+            free_cached_info(ci);
+        }
+    }
+
+    return SUCCESS;
+}
+
 /*
  * Gets the attributes (stat) of the node at path.
  */
@@ -260,21 +276,25 @@ static int fms_readdir(const char *path, void *buf,
     (void)offset;
     (void)fi;
 
+    filler(buf, ".", NULL, 0);
+    filler(buf, "..", NULL, 0);
+
     if(!strcmp(path, "/")) {                      /* Path is to mounted directory */
-        num_names = get_photo_names("", &names);  /* Get all photo names with no photoset attached */
+        num_names = get_photoset_names(&names);   /* Report photoset names */
         for(i = 0; i < num_names; i++) {
             filler(buf, names[i], NULL, 0);
             free(names[i]);
         }
         if(num_names > 0)
             free(names);
-        num_names = get_photoset_names(&names);         /* We are going to want to fill the photosets as well */
+
+        num_names = get_photo_names("", &names);  /* Get all photo names with no photoset attached */
     }
     else
         num_names = get_photo_names(path + 1, &names); /* Get the names of photos in the photoset */
 
-    filler(buf, ".", NULL, 0);
-    filler(buf, "..", NULL, 0);
+    if(num_names > 0)
+        prime_photo_size_cache(path + 1, names, num_names);
 
     for(i = 0; i < num_names; i++) {
         filler(buf, names[i], NULL, 0);

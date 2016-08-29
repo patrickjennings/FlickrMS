@@ -11,8 +11,8 @@ IMGM:=MagickWand
 INCLUDES:=`pkg-config --libs $(FUSE) $(GLIB) $(FLKC) $(CURL) $(LXML) $(IMGM)`
 
 OPTS:=-mtune=native -march=native -O2 -pipe
-CFLAGS:=$(OPTS) -Wall -W -Werror -Wextra -Wconversion -Wsign-conversion -fstack-protector-strong
-LDFLAGS:=-lm -Wl,-O1,--as-needed,-z,relro
+CFLAGS:=$(OPTS) -Wall -W -Werror -Wextra -Wconversion -Wsign-conversion -fstack-protector-strong -floop-parallelize-all -ftree-parallelize-loops=4
+LDFLAGS:=-lm -Wl,-O1,--as-needed,-z,relro -fopenmp
 
 OBJS:=flickrms.o cache.o wget.o conf.o
 
