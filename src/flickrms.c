@@ -191,8 +191,26 @@ static int process_photo(const char *photoset, const char *photo, cached_informa
         }
 
         ci->size = (unsigned int)photo_size;
-        set_photo_size(photoset, photo, (unsigned int)photo_size);
     }
+    else { /* Possibly dirty. Try stating cached directory. */
+        struct stat st_buf;
+        char *cached_path = (char *)malloc(strlen(photoset) + strlen(photo) + strlen(tmp_path) + 3);
+        strcpy(cached_path, tmp_path);
+        if(strcmp(photoset,"")) {
+            strcat(cached_path, "/");
+            strcat(cached_path, photoset);
+        }
+        strcat(cached_path, "/");
+        strcat(cached_path, photo);
+
+        if(!stat(cached_path, &st_buf)) {
+            ci->size = (unsigned int)st_buf.st_size;
+        }
+
+        free(cached_path);
+    }
+
+    set_photo_size(photoset, photo, ci->size);
     return SUCCESS;
 }
 
@@ -420,7 +438,7 @@ static int fms_write(const char *path, const char *buf, size_t size,
     if(get_photoset_photo_from_path(path, &photoset, &photo))
         return FAIL;
 
-    set_photo_dirty( photoset, photo, DIRTY );
+    set_photo_dirty(photoset, photo, DIRTY);
 
     free(photoset);
     free(photo);
@@ -431,8 +449,8 @@ static int fms_write(const char *path, const char *buf, size_t size,
 
 static int fms_flush(const char *path, struct fuse_file_info *fi) {
     (void)path;
-    int ret = close((int)fi->fh);
-    return (ret < 0) ? -errno : SUCCESS;
+    (void)fi;
+    return SUCCESS;
 }
 
 static int fms_release(const char *path, struct fuse_file_info *fi) {
@@ -447,14 +465,16 @@ static int fms_release(const char *path, struct fuse_file_info *fi) {
     strcpy(temp_scratch_path, tmp_path);
     strcat(temp_scratch_path, path);
 
-    if(get_photo_dirty( photoset, photo ) == DIRTY && MagickPingImage(mw, temp_scratch_path)) {
-        upload_photo( photoset, photo, temp_scratch_path );
+    if(get_photo_dirty(photoset, photo) == DIRTY && MagickPingImage(mw, temp_scratch_path)) {
+        upload_photo(photoset, photo, temp_scratch_path);
     }
 
     free(temp_scratch_path);
     free(photoset);
     free(photo);
-    return SUCCESS;
+
+    int ret = close((int)fi->fh);
+    return (ret < 0) ? -errno : SUCCESS;
 }
 
 static int fms_create(const char *path, mode_t mode, struct fuse_file_info *fi) {
