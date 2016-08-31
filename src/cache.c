@@ -330,6 +330,7 @@ static int check_photoset_cache(cached_photoset *cps) {
 
     while((fp = get_photoset_photos(cps, page++))) {
         processed = populate_photoset_cache(cps, fp);
+        flickcurl_free_photos(fp);
         if(processed < 0)
             return FAIL;
 
@@ -337,8 +338,6 @@ static int check_photoset_cache(cached_photoset *cps) {
 
         if(processed < PHOTOS_PER_API_CALL)
             break;
-
-        flickcurl_free_photos(fp);
     }
 
     cps->ci.time = time(NULL);
