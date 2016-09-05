@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <unistd.h>
 #include <curl/curl.h>
 
 #include "wget.h"
@@ -41,6 +42,7 @@ int wget(const char *in, const char *out) {
     res = curl_easy_perform(curl);  // Perform the download and write
 
     curl_easy_cleanup(curl);
+    fsync(fileno(fp));
     fclose(fp);
     return res;
 }
