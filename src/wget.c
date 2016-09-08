@@ -6,20 +6,15 @@
 
 #include "wget.h"
 
-static CURL *curl_global;
 
 int wget_init() {
     if(curl_global_init(CURL_GLOBAL_ALL))
-        return FAIL;
-
-    if(!(curl_global = curl_easy_init()))
         return FAIL;
 
     return SUCCESS;
 }
 
 void wget_destroy() {
-    curl_easy_cleanup(curl_global);
     curl_global_cleanup();
 }
 
@@ -28,7 +23,7 @@ int wget(const char *in, const char *out) {
     CURLcode res;
     FILE *fp;
 
-    if(!(curl = curl_easy_duphandle(curl_global)))
+    if(!(curl = curl_easy_init()))
         return FAIL;
 
     if(!(fp = fopen(out, "wb")))    // Open in binary
@@ -62,7 +57,7 @@ int get_url_content_length(const char *url) {
     CURLcode res;
     double content_length;
 
-    if(!(curl = curl_easy_duphandle(curl_global)))
+    if(!(curl = curl_easy_init()))
         return FAIL;
 
     // Set the curl easy options

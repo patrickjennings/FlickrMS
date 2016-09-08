@@ -51,6 +51,10 @@ static inline cached_photoset *create_cached_photoset() {
     return (cached_photoset *)calloc(1, sizeof(cached_photoset));
 }
 
+static inline GHashTable *create_cache() {
+    return g_hash_table_new(g_str_hash, g_str_equal);
+}
+
 
 /*
  * Initialize the flickcurl connection
@@ -123,9 +127,9 @@ static cached_information *copy_cached_info(const cached_information *ci) {
     if(!newci)
         return NULL;
     *newci = *ci;
-    if( ci->name )
+    if(ci->name)
         newci->name = strdup(ci->name);
-    if( ci->id )
+    if(ci->id)
         newci->id = strdup(ci->id);
     return newci;
 }
@@ -143,7 +147,7 @@ static gboolean free_photo_ht(gpointer key, gpointer value, gpointer user_data) 
     (void)user_data;
     cached_photo *cp = value;
 
-    if( cp->ci.dirty == CLEAN ) {
+    if(cp->ci.dirty == CLEAN) {
         free(cp->ci.uri);
         free(cp->ci.name);
         free(cp->ci.id);
@@ -176,7 +180,7 @@ static gboolean free_photoset_ht(gpointer key, gpointer value, gpointer user_dat
         return TRUE;
     }
     else {
-        cps->set = ( cps->ci.dirty == CLEAN ) ? CACHE_UNSET : CACHE_SET;
+        cps->set = (cps->ci.dirty == CLEAN) ? CACHE_UNSET : CACHE_SET;
         return FALSE;
     }
 }
@@ -203,7 +207,12 @@ static int check_cache() {
     /* Wipe clean entries from the cache. */
     g_hash_table_foreach_remove(photoset_ht, free_photoset_ht, NULL);
 
-    if( !g_hash_table_lookup( photoset_ht, "" ) ) {
+    if(g_hash_table_size(photoset_ht) == 0) {
+        g_hash_table_destroy(photoset_ht);
+        photoset_ht = create_cache();
+    }
+
+    if(!g_hash_table_lookup(photoset_ht, "")) {
         /* Create an empty photoset container for the photos not in a photoset */
         if(new_cached_photoset(&cps, NULL))
             return FAIL;
@@ -216,7 +225,7 @@ static int check_cache() {
 
     /* Add the photosets to the cache */
     for(i = 0; fps[i]; i++) {
-        if( !g_hash_table_lookup( photoset_ht, fps[i]->title ) ) {
+        if(!g_hash_table_lookup(photoset_ht, fps[i]->title)) {
             if(new_cached_photoset(&cps, fps[i]))
                 return FAIL;
             g_hash_table_insert(photoset_ht, strdup(cps->ci.name), cps);
@@ -247,7 +256,7 @@ static int populate_photoset_cache(cached_photoset *cps, flickcurl_photo **fp) {
 
         /* Check if dirty version already exists in the database. */
         if((cp = g_hash_table_lookup(cps->photo_ht, title))) {
-            if(!strcmp( cp->ci.id, id))
+            if(!strcmp(cp->ci.id, id))
                 continue;
         }
         else if((cp = g_hash_table_lookup(cps->photo_ht, id))) {
@@ -354,7 +363,7 @@ static int check_photoset_cache(cached_photoset *cps) {
 int flickr_cache_init() {
     if(flickr_init())
         return FAIL;
-    photoset_ht = g_hash_table_new(g_str_hash, g_str_equal);
+    photoset_ht = create_cache();
     last_cleaned = 0;
     pthread_rwlock_init(&cache_lock, NULL);
     return SUCCESS;
@@ -563,14 +572,14 @@ int set_photoset_name(const char *photoset, const char *newname) {
 
     pthread_rwlock_wrlock(&cache_lock);
 
-    if( g_hash_table_lookup_extended(photoset_ht, photoset, &key, &value) ) {
+    if(g_hash_table_lookup_extended(photoset_ht, photoset, &key, &value)) {
         cps = value;
 
-        if( cps->ci.dirty == CLEAN )
-            if( flickcurl_photosets_editMeta( fc, cps->ci.id, newname, NULL ) )
+        if(cps->ci.dirty == CLEAN)
+            if(flickcurl_photosets_editMeta(fc, cps->ci.id, newname, NULL))
                 goto fail;
 
-        free( cps->ci.name );
+        free(cps->ci.name);
         cps->ci.name = strdup(newname);
 
         g_hash_table_remove(photoset_ht, photoset);
@@ -649,7 +658,7 @@ int create_empty_photoset(const char *photoset) {
     cps->ci.dirty = DIRTY;
     cps->ci.time = time(NULL);
     cps->set = CACHE_SET;
-    cps->photo_ht = g_hash_table_new(g_str_hash, g_str_equal);
+    cps->photo_ht = create_cache();
 
     g_hash_table_insert(photoset_ht, strdup(cps->ci.name), cps);
 
@@ -669,11 +678,11 @@ int create_empty_photo(const char *photoset, const char *photo) {
     cps = g_hash_table_lookup(photoset_ht, photoset);
 
     /* Check to see photoset exists. */
-    if( !cps )
+    if(!cps)
         goto fail;
 
    /* Check if photo already exists */
-    if( g_hash_table_lookup( cps->photo_ht, photo  ) )
+    if(g_hash_table_lookup(cps->photo_ht, photo))
         goto fail;
 
     /* The new empty photo */
@@ -720,15 +729,15 @@ int upload_photo(const char *photoset, const char *photo, const char *path) {
     status = flickcurl_photos_upload_params(fc, &params);
 
     if(status) {
-        if( cps->ci.dirty == DIRTY ) { // if photoset is dirty, create it
+        if(cps->ci.dirty == DIRTY) { // if photoset is dirty, create it
             char * photosetid = flickcurl_photosets_create(fc, cps->ci.name, NULL, status->photoid, NULL);
 
-            if( photosetid ) {
+            if(photosetid) {
                 cps->ci.id = photosetid;
                 cps->ci.dirty = CLEAN;
             }
         }
-        else if( strcmp( cps->ci.id, "" ) ) { // if photoset has an id, add new photo to it
+        else if(strcmp(cps->ci.id, "")) { // if photoset has an id, add new photo to it
             flickcurl_photosets_addPhoto(fc, cps->ci.id, status->photoid);
         }
 
@@ -793,7 +802,7 @@ int remove_photo_from_cache(const char *photoset, const char *photo) {
     if(!(cps = g_hash_table_lookup(photoset_ht, photoset)))
         goto fail;
 
-    if( g_hash_table_lookup_extended(cps->photo_ht, photo, &key, &value) ) {
+    if(g_hash_table_lookup_extended(cps->photo_ht, photo, &key, &value)) {
         cp = value;
 
         if(cp->ci.dirty) {

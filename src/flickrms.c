@@ -49,8 +49,6 @@
 static uid_t uid;   /* The user id of the user that mounted the filesystem */
 static gid_t gid;   /* The group id of the user */
 
-static MagickWand *mw;
-
 static char *tmp_path;
 
 
@@ -150,14 +148,11 @@ static inline void remove_tmp_path() {
     free(tmp_path);
 }
 
-static inline int imagemagick_init() {
+static inline void imagemagick_init() {
     MagickWandGenesis();
-    mw = NewMagickWand();
-    return mw ? SUCCESS : FAIL;
 }
 
 static inline void imagemagick_destroy() {
-    DestroyMagickWand(mw);
     MagickWandTerminus();
 }
 
@@ -465,8 +460,16 @@ static int fms_release(const char *path, struct fuse_file_info *fi) {
     strcpy(temp_scratch_path, tmp_path);
     strcat(temp_scratch_path, path);
 
-    if(get_photo_dirty(photoset, photo) == DIRTY && MagickPingImage(mw, temp_scratch_path)) {
-        upload_photo(photoset, photo, temp_scratch_path);
+    if(get_photo_dirty(photoset, photo) == DIRTY) {
+        MagickWand *mw = NewMagickWand();
+
+        if(!mw)
+            return FAIL;
+
+        if(MagickPingImage(mw, temp_scratch_path))
+            upload_photo(photoset, photo, temp_scratch_path);
+
+        DestroyMagickWand(mw);
     }
 
     free(temp_scratch_path);
@@ -485,12 +488,12 @@ static int fms_create(const char *path, mode_t mode, struct fuse_file_info *fi) 
     if(get_photoset_photo_from_path(path, &photoset, &photo))
         return FAIL;
 
-    int retval = create_empty_photo( photoset, photo );
+    int retval = create_empty_photo(photoset, photo);
     
     free(photoset);
     free(photo);
 
-    if( retval )
+    if(retval)
         return FAIL;
 
     temp_scratch_path = (char *)malloc(strlen(tmp_path) + strlen(path) + 1);
@@ -632,8 +635,8 @@ int main(int argc, char *argv[]) {
         return ret;
     if((ret = wget_init()))
         return ret;
-    if((ret = imagemagick_init()))
-        return ret;
+
+    imagemagick_init();
 
     ret = fuse_main(argc, argv, &flickrms_oper, NULL);
 
