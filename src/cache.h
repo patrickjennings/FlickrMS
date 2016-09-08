@@ -3,9 +3,12 @@
 
 #include "common.h"
 
+#define PHOTO_SIZE_UNSET 0
+
 typedef struct {
     char *name;
     char *id;
+    char *uri;
     time_t time;
     unsigned int size;
     unsigned short dirty;
