@@ -21,7 +21,7 @@ PROJ:=flickrms
 all: $(PROJ)
 
 $(PROJ): $(OBJS)
-	$(CC) $(LDFLAGS) -o $@ $^ $(INCLUDES)
+	$(CC) -o $@ $^ $(INCLUDES) $(LDFLAGS)
 
 flickrms.o: flickrms.c cache.c wget.c
 	$(CC) $(CFLAGS) `pkg-config --cflags $(FUSE) $(IMGM)` -c $<
